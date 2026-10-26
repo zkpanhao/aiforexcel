@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <title>AI for Excel</title>
+  </head>
+  <body>
+    <main class="app">
+      <header><strong>AI for Excel</strong><span id="selection">未选择区域</span></header>
+      <section id="messages" class="messages" role="log" aria-live="polite"></section>
+      <div class="conversation-actions"><button id="clearConversation" class="secondary">清除对话</button></div>
+      <section id="workflowPanel" class="workflow" aria-label="分步任务进度" hidden></section>
+      <textarea id="prompt" aria-label="分析问题或修改要求" placeholder="输入分析问题或修改要求，可连续追问（Ctrl+Enter 发送）"></textarea>
+      <div class="actions"><button id="send" disabled>发送</button><button id="undo" disabled title="还原最近一轮实际修改的区域；会覆盖这些区域后续的手动编辑">恢复上一步</button><button id="commonCommands" class="secondary" type="button">常用命令</button><button id="saveCommonCommand" class="secondary" type="button">保存常用命令</button><button id="cancel" hidden>取消</button></div>
+      <div id="commonCommandList" class="common-command-list" hidden role="group" aria-label="常用命令，点击使用，右键修改或删除"></div>
+      <div id="commandMenu" class="command-menu" role="menu" aria-label="常用命令操作" hidden>
+        <button id="commandEdit" type="button" role="menuitem">修改</button>
+        <button id="commandDelete" type="button" role="menuitem" class="danger">删除</button>
+      </div>
+      <section id="commandEditor" class="command-editor" aria-label="修改常用命令" hidden>
+        <label for="commandEditText">修改常用命令</label>
+        <textarea id="commandEditText" rows="4" maxlength="2000" aria-label="常用命令内容"></textarea>
+        <div class="actions"><button id="commandEditSave" type="button">保存修改</button><button id="commandEditCancel" type="button" class="secondary">取消</button></div>
+      </section>
+      <small id="commandError" class="command-error" role="alert" hidden></small>
+      <details><summary>连接设置</summary><label>供应商 <select id="provider" aria-label="选择模型供应商"></select></label><label>Base URL <input id="baseUrl" value="https://jxai.keloom.com/v1" /></label><label>模型（也可手动输入）<input id="model" value="gpt-6.1-sol" /></label><button id="modelsRefresh" class="secondary">获取模型列表</button><label id="modelPickerLabel" hidden>接口返回的模型<select id="modelPicker" aria-label="选择接口返回的模型"></select></label><small id="modelListStatus" role="status"></small><label>API Key <input id="apiKey" type="password" autocomplete="off" spellcheck="false" /></label><label class="check"><input id="rememberKey" type="checkbox" />记住密钥（仅此设备）</label><div class="settings-actions"><button id="saveSettings" class="secondary">保存设置</button><button id="forgetKey" class="secondary">清除已保存密钥</button></div><small id="settingsStatus" role="status">供应商、地址和模型会自动保存；密钥需勾选后才保存。</small><p>内置供应商使用各自的 OpenAI 兼容接口地址；也可以选择“自定义 / 中转”填写自己的 Base URL。连接设置保存在本机独立文件中；密钥仅在勾选后保存，未额外加密，不写入工作簿。</p></details>
+      <small id="status">就绪</small><small id="stopwatch" class="stopwatch" hidden aria-live="off"></small>
+    </main>
+  </body>
+</html>

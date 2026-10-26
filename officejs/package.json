@@ -1,0 +1,40 @@
+{
+  "name": "ai-for-excel-officejs",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "build": "webpack --mode production",
+    "dev": "webpack serve --mode development",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "validate": "office-addin-manifest validate manifest.xml",
+    "certs": "office-addin-dev-certs install",
+    "start": "node scripts/start-office.cjs",
+    "stop": "office-addin-debugging stop manifest.xml",
+    "check:local": "node scripts/check-local.cjs",
+    "local:install": "node scripts/install-local.cjs install",
+    "local:start": "node scripts/install-local.cjs start",
+    "local:status": "node scripts/install-local.cjs status",
+    "local:rollback": "node scripts/install-local.cjs rollback",
+    "local:catalog": "node scripts/install-local.cjs catalog"
+  },
+  "dependencies": {
+    "@microsoft/office-js": "^1.1.98"
+  },
+  "devDependencies": {
+    "@types/office-js": "^1.0.377",
+    "copy-webpack-plugin": "^12.0.2",
+    "css-loader": "^7.1.2",
+    "html-webpack-plugin": "^5.6.0",
+    "office-addin-debugging": "^7.0.1",
+    "office-addin-dev-certs": "^3.0.1",
+    "office-addin-manifest": "^3.0.1",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.2",
+    "webpack": "^5.97.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.0"
+  }
+}

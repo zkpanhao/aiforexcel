@@ -1,0 +1,49 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+work/
+coverage/
+*.tsbuildinfo
+*.log
+
+# Local configuration, credentials and certificates
+.env
+.env.*
+!.env.example
+.npmrc.local
+.codex/
+.aws/
+.cache/
+.office-addin-dev-certs/
+runtime/
+releases/
+install.json
+current.json
+user-data/
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.cer
+
+# Workbooks and local backups
+*.xlsx
+*.xlsm
+*.xlsb
+*.xls
+*.xlam
+*.xla
+~$*
+*.bak
+*.tmp
+*.zip
+
+# Editor and operating system files
+.idea/
+.vs/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

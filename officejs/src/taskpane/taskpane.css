@@ -1,0 +1,48 @@
+:root { font-family: "Microsoft YaHei", system-ui, sans-serif; color: #202124; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f7f9fc; }
+.app { display: flex; flex-direction: column; gap: 10px; height: 100vh; padding: 12px; }
+header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+header span, small { color: #687386; font-size: 12px; overflow-wrap: anywhere; }
+header span { max-width: 55%; text-align: right; }
+.messages { flex: 1; overflow: auto; background: white; border: 1px solid #d9dee8; border-radius: 8px; padding: 10px; white-space: pre-wrap; }
+textarea { min-height: 64px; max-height: 160px; resize: vertical; border: 1px solid #c9d1df; border-radius: 8px; padding: 8px; font: inherit; }
+.messages { min-height: 80px; font-size: 13px; overflow-wrap: anywhere; }
+.messages p { margin: 4px 0 14px; }
+.conversation-actions { display: flex; justify-content: flex-end; }
+.conversation-actions .secondary { margin-top: 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions .secondary { margin-top: 0; }
+.common-command-list { flex-shrink: 0; max-height: 160px; overflow: auto; padding: 4px; background: #fff; border: 1px solid #c9d1df; border-radius: 6px; }
+.common-command-list .common-command-item { display: block; width: 100%; text-align: left; background: transparent; color: #25496f; padding: 7px 8px; overflow-wrap: anywhere; font: inherit; font-size: 12px; }
+.common-command-item:hover, .common-command-item:focus-visible { background: #eaf2fc; }
+.command-menu { position: fixed; z-index: 100; width: 120px; max-width: calc(100vw - 8px); padding: 4px; background: white; border: 1px solid #c9d1df; border-radius: 6px; box-shadow: 0 4px 16px #182b4626; }
+.command-menu button { display: block; width: 100%; padding: 8px 12px; text-align: left; background: white; color: #25496f; }
+.command-menu button:hover, .command-menu button:focus-visible { background: #eaf2fc; }
+.command-menu .danger { color: #b42318; }
+.command-editor { flex-shrink: 0; padding: 8px; background: white; border: 1px solid #c9d1df; border-radius: 6px; }
+.command-editor label { margin: 0 0 6px; font-size: 12px; }
+.command-editor textarea { width: 100%; margin-bottom: 6px; }
+.command-editor .secondary { margin-top: 0; }
+.command-error { color: #b42318; }
+button { border: 0; border-radius: 6px; padding: 8px 14px; cursor: pointer; background: #1464c4; color: white; }
+button:disabled { cursor: default; opacity: .5; }
+[hidden] { display: none !important; }
+.secondary { margin-top: 6px; padding: 5px 8px; background: #e3ebf6; color: #25496f; }
+details { flex-shrink: 0; max-height: 40vh; overflow: auto; }
+details { font-size: 12px; color: #536174; }
+label { display: block; margin-top: 6px; }
+input, select { width: 100%; margin-top: 3px; padding: 5px; border: 1px solid #c9d1df; border-radius: 4px; }
+.check { display: flex; align-items: center; gap: 6px; }
+.check input { width: auto; margin: 0; }
+.settings-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+#settingsStatus { display: block; }
+#modelListStatus { display: block; margin-top: 5px; }
+.stopwatch { margin-left: 6px; color: #1464c4; font-variant-numeric: tabular-nums; }
+.workflow { flex: 0 1 auto; max-height: 48vh; overflow: auto; padding: 10px; background: #fff; border: 1px solid #b7cde8; border-radius: 8px; font-size: 12px; }
+.workflow p { margin: 6px 0; }
+.workflow ol { padding-left: 22px; margin: 8px 0; }
+.workflow li { margin: 8px 0; }
+.workflow li small { display: block; white-space: pre-wrap; }
+.workflow textarea { width: 100%; min-height: 48px; font-size: 12px; margin-bottom: 6px; }
+.workflow > small { display: block; margin-top: 8px; }

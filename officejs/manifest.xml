@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+  <Id>e6e1a25b-a2dc-4c80-9177-6c1e9e0e9d61</Id>
+  <Version>1.0.0.1</Version>
+  <ProviderName>AI for Excel</ProviderName>
+  <DefaultLocale>zh-CN</DefaultLocale>
+  <DisplayName DefaultValue="AI for Excel" />
+  <Description DefaultValue="用自然语言读取和操作当前 Excel 选区。" />
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://localhost:3000/" />
+  <AppDomains><AppDomain>https://localhost:3000</AppDomain></AppDomains>
+  <Hosts><Host Name="Workbook" /></Hosts>
+  <Requirements><Sets DefaultMinVersion="1.13"><Set Name="ExcelApi" /></Sets></Requirements>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts><Host xsi:type="Workbook">
+      <DesktopFormFactor>
+        <FunctionFile resid="Commands.Url" />
+        <ExtensionPoint xsi:type="PrimaryCommandSurface">
+          <OfficeTab id="TabHome">
+            <Group id="AIForExcel.Group">
+              <Label resid="Group.Label" />
+              <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+              <Control xsi:type="Button" id="AIForExcel.OpenTaskpane">
+                <Label resid="OpenTaskpane.Label" />
+                <Supertip><Title resid="OpenTaskpane.Label" /><Description resid="OpenTaskpane.Description" /></Supertip>
+                <Icon><bt:Image size="16" resid="Icon.16" /><bt:Image size="32" resid="Icon.32" /><bt:Image size="80" resid="Icon.80" /></Icon>
+                <Action xsi:type="ShowTaskpane"><TaskpaneId>AIForExcel.Taskpane</TaskpaneId><SourceLocation resid="Taskpane.Url" /></Action>
+              </Control>
+            </Group>
+          </OfficeTab>
+        </ExtensionPoint>
+      </DesktopFormFactor>
+    </Host></Hosts>
+    <Resources>
+      <bt:Images><bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png" /><bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png" /><bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png" /></bt:Images>
+      <bt:Urls><bt:Url id="Commands.Url" DefaultValue="https://localhost:3000/commands.html" /><bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html" /></bt:Urls>
+      <bt:ShortStrings><bt:String id="Group.Label" DefaultValue="AI for Excel" /><bt:String id="OpenTaskpane.Label" DefaultValue="打开 AI 助手" /></bt:ShortStrings>
+      <bt:LongStrings><bt:String id="OpenTaskpane.Description" DefaultValue="读取当前选区并用自然语言执行 Excel 操作。" /></bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
