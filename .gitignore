@@ -47,3 +47,6 @@ user-data/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Personal development notes (local only; never sync to GitHub)
+/.local/
