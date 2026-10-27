@@ -190,6 +190,37 @@ export async function prepareExtended(context: Excel.RequestContext, source: Exc
           if (sourceView.rowCount) targetView.set({ values: sourceView.values });
           break;
         }
+        case "lookup_replace": {
+          const lookup = context.workbook.worksheets.getItem(op.lookupSheet).getRange(op.lookupAddress);
+          lookup.load("values"); target!.load("values");
+          await context.sync();
+          const mapping = new Map<string, string | number | boolean>();
+          for (const row of lookup.values as unknown[][]) {
+            const key = row[0] === null || row[0] === undefined ? "" : String(row[0]);
+            if (!key) continue;
+            const replacement = row[1] as string | number | boolean | null;
+            if (replacement === null || replacement === undefined) continue;
+            const previous = mapping.get(key);
+            if (previous !== undefined && String(previous) !== String(replacement)) throw new Error(`映射表中的旧名称“${key}”对应多个不同新名称`);
+            mapping.set(key, replacement);
+          }
+          const values = target!.values as unknown[][];
+          const writes: { row: number; value: string | number | boolean }[] = [];
+          values.forEach((row, index) => {
+            const key = row[0] === null || row[0] === undefined ? "" : String(row[0]);
+            const replacement = mapping.get(key);
+            if (replacement !== undefined && String(replacement) !== String(row[0])) writes.push({ row: index, value: replacement });
+          });
+          let start = 0;
+          while (start < writes.length) {
+            let end = start + 1;
+            while (end < writes.length && writes[end].row === writes[end - 1].row + 1) end++;
+            const first = writes[start].row, data = writes.slice(start, end).map(item => [item.value]);
+            target!.getCell(first, 0).getResizedRange(data.length - 1, 0).values = data;
+            start = end;
+          }
+          break;
+        }
         case "resize_range":
           if (op.rowHeight !== undefined) target!.format.rowHeight = op.rowHeight;
           if (op.columnWidth !== undefined) target!.format.columnWidth = op.columnWidth;

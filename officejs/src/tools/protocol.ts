@@ -13,6 +13,7 @@ export type ExcelOperation =
   | ({ kind: "format_range"; sheet: string; address: string } & RangeStyle)
   | { kind: "copy_formats"; sheet: string; sourceAddress: string; address: string }
   | { kind: "copy_visible_values"; sheet: string; sourceAddress: string; address: string }
+  | { kind: "lookup_replace"; sheet: string; address: string; lookupSheet: string; lookupAddress: string }
   | { kind: "resize_range"; sheet: string; address: string; rowHeight?: number; columnWidth?: number; autofitRows?: boolean; autofitColumns?: boolean }
   | { kind: "merge_cells"; sheet: string; address: string; across?: boolean }
   | { kind: "unmerge_cells"; sheet: string; address: string }
@@ -108,7 +109,7 @@ export function parsePlan(raw: string): AgentPlan {
       if (Object.keys(op).some(k => !["kind", "name", "data"].includes(k))) throw new Error("新建工作表包含不支持的参数");
       continue;
     }
-    if (!["write_values", "write_formulas", "transform_text", "clear_contents", "clear_formats", "format_range", "copy_formats", "copy_visible_values", "resize_range", "merge_cells", "unmerge_cells", "sort_range", "filter_range", "clear_filter", "conditional_format", "create_chart", "create_pivot", "edit_structure"].includes(String(op.kind))) throw new Error(`不支持的操作：${String(op.kind)}`);
+    if (!["write_values", "write_formulas", "transform_text", "clear_contents", "clear_formats", "format_range", "copy_formats", "copy_visible_values", "lookup_replace", "resize_range", "merge_cells", "unmerge_cells", "sort_range", "filter_range", "clear_filter", "conditional_format", "create_chart", "create_pivot", "edit_structure"].includes(String(op.kind))) throw new Error(`不支持的操作：${String(op.kind)}`);
     if (typeof op.sheet !== "string" || typeof op.address !== "string") throw new Error("操作缺少工作表或区域");
     const bounds = parseAddress(op.address);
     if (bounds.rows * bounds.cols > RANGE_CELL_LIMIT) throw new Error("目标区域最多 100000 格");
@@ -142,6 +143,15 @@ export function parsePlan(raw: string): AgentPlan {
       const sourceBounds = parseAddress(op.sourceAddress);
       if (sourceBounds.rows * sourceBounds.cols > RANGE_CELL_LIMIT) throw new Error("复制源区域最多 100000 格");
       if (op.kind === "copy_visible_values" && (sourceBounds.rows !== bounds.rows || sourceBounds.cols !== bounds.cols)) throw new Error("可见单元格复制要求源区域与目标区域尺寸一致");
+    }
+    if (op.kind === "lookup_replace") {
+      allowed.push("lookupSheet", "lookupAddress");
+      if (bounds.cols !== 1) throw new Error("映射替换目标必须是单列区域");
+      if (typeof op.lookupSheet !== "string" || !op.lookupSheet.trim() || /^_AI_backup_/i.test(op.lookupSheet)) throw new Error("映射表工作表名称无效");
+      if (typeof op.lookupAddress !== "string") throw new Error("映射替换缺少参考区域");
+      const lookupBounds = parseAddress(op.lookupAddress);
+      if (lookupBounds.cols !== 2) throw new Error("映射参考区域必须是两列：旧名称和新名称");
+      if (lookupBounds.rows * lookupBounds.cols > RANGE_CELL_LIMIT) throw new Error("映射参考区域最多 100000 格");
     }
     if (op.kind === "resize_range") {
       allowed.push("rowHeight", "columnWidth", "autofitRows", "autofitColumns");

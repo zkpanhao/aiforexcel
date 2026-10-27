@@ -51,6 +51,12 @@ async function verify(): Promise<void> {
     ensure(hidden.rowHidden, "Visible value copy did not preserve the filtered hidden row");
   });
   await Excel.run(async context => { context.workbook.worksheets.getItem(sheetId).autoFilter.remove(); await context.sync(); });
+  await Excel.run(async context => { const lookup = context.workbook.worksheets.add("AI_Lookup"); lookup.getRange("E15:F16").values = [["甲", "甲店"], ["乙", "乙店"]]; await context.sync(); });
+  await run("跨表映射替换", [{ kind: "lookup_replace", lookupSheet: "AI_Lookup", lookupAddress: "E15:F16", address: "A2:A4" }], async (sheet, context) => {
+    const values = sheet.getRange("A2:A4"); values.load(["values", "formulas"]); await context.sync();
+    ensure(JSON.stringify(values.values) === JSON.stringify([["甲店"], ["乙店"], ["甲店"]]) && values.formulas.every(row => row.every(value => value !== "=A2")), "Cross-sheet mapping replacement mismatch");
+  });
+  await Excel.run(async context => { context.workbook.worksheets.getItem("AI_Lookup").delete(); await context.sync(); });
 
   let rejected = false;
   try { await applyOperations(parsePlan(JSON.stringify({ answer: "合并保护", operations: [{ kind: "merge_cells", sheet: name, address: "A1:C4" }] })), initial); }
