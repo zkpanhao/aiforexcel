@@ -57,6 +57,14 @@ function host(failWrite = false, includeTarget = false, includePivot = false) {
   return { source, target, events, sheets, selected };
 }
 const clear = () => parsePlan(JSON.stringify({ answer: "已清除", operations: [{ kind: "clear_contents", sheet: "数据", address: "A1:A2" }] }));
+test("copy_formats uses native format-only copy and keeps cell contents", async () => {
+  const h = host();
+  const selected = { ...h.selected, dataMode: "metadata" as const, values: [], formulas: [] };
+  const plan = parsePlan(JSON.stringify({ answer: "已复制格式", operations: [{ kind: "copy_formats", sheet: "数据", sourceAddress: "A1:A1", address: "A2:A2" }] }));
+  await applyOperations(plan, selected);
+  assert.ok(h.events.some(event => event.endsWith(":Formats")));
+  assert.deepEqual(h.source.range.data, [[1], [2]]);
+});
 test("snapshot sync precedes mutation; undo restores snapshot and cleans up", async () => {
   const h = host();
   await applyOperations(clear(), h.selected);

@@ -14,7 +14,7 @@ export interface CellFormat {
 }
 export const MAX_READ_CELLS = 100000;
 export const MAX_FORMAT_CELLS = 10000;
-export type ReadMode = "adaptive" | "metadata" | "full";
+export type ReadMode = "adaptive" | "metadata" | "format" | "full";
 export async function readSelection(mode: ReadMode = "adaptive", target?: { sheetId: string; address: string }, includeFormats = false): Promise<SelectedRange> {
   return Excel.run(async (context) => {
     const range = target ? context.workbook.worksheets.getItem(target.sheetId).getRange(target.address) : context.workbook.getSelectedRange(), sheet = range.worksheet;
@@ -40,11 +40,23 @@ export async function readSelection(mode: ReadMode = "adaptive", target?: { shee
     // Excel may report just the anchor address for a merged range even while
     // values and dimensions describe the full rectangle. Preserve that rectangle.
     const base = { workbook: context.workbook.name, sheet: sheet.name, sheetId: sheet.id, address: addressFromBounds(bounds), bounds, selectionKind, ...(selectionLabel ? { selectionLabel } : {}) };
+    if (mode === "metadata") return { ...base, values: [], formulas: [], dataMode: "metadata" as const, formatMode: "metadata" as const };
+    if (mode === "format") {
+      if (cellCount > MAX_FORMAT_CELLS) throw new Error(`一次最多读取 ${MAX_FORMAT_CELLS} 个单元格的格式；请缩小选区后重试`);
+      const formats = await readFormats(context, effective);
+      return { ...base, values: [], formulas: [], dataMode: "metadata" as const, formatMode: "full" as const, formats };
+    }
     if (!shouldReadData) return { ...base, values: [], formulas: [], dataMode: "metadata" as const, formatMode: "metadata" as const };
     effective.load(["values", "formulas"]);
     await context.sync();
     if (!includeFormats) return { ...base, values: effective.values, formulas: effective.formulas, dataMode: "full" as const, formatMode: "metadata" as const };
     if (cellCount > MAX_FORMAT_CELLS) throw new Error(`一次最多读取 ${MAX_FORMAT_CELLS} 个单元格的格式；请缩小选区后重试`);
+    const formats = await readFormats(context, effective);
+    return { ...base, values: effective.values, formulas: effective.formulas, dataMode: "full" as const, formatMode: "full" as const, formats };
+  });
+}
+
+async function readFormats(context: Excel.RequestContext, effective: Excel.Range): Promise<CellFormat[][]> {
     const reads: { cell: Excel.Range; row: number; col: number }[] = [];
     for (let row = 0; row < effective.rowCount; row++) for (let col = 0; col < effective.columnCount; col++) {
       const cell = effective.getCell(row, col);
@@ -64,6 +76,5 @@ export async function readSelection(mode: ReadMode = "adaptive", target?: { shee
         numberFormat: numberFormat?.[0]?.[0] ?? null,
       };
     }
-    return { ...base, values: effective.values, formulas: effective.formulas, dataMode: "full" as const, formatMode: "full" as const, formats };
-  });
+    return formats;
 }

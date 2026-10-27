@@ -34,7 +34,7 @@ export class WorkflowController {
           if (phase === "feedback") this.hooks.stage(`第 ${index + 1} 步 · 模型：${message}`, true);
         };
         this.hooks.stage(`第 ${index + 1} 步：读取 ${step.sheet}!${step.address}`);
-        let selected = await readSelection("adaptive", { sheetId: step.sheet, address: step.address });
+        let selected = await readSelection("metadata", { sheetId: step.sheet, address: step.address });
         if (!current.watched.some(ref => ref.sheet === selected.sheetId && ref.address === selected.address)) current.watched.push({ sheet: selected.sheetId, address: selected.address });
         current.guard = await workflowGuard(current); await saveWorkflow(current);
         const context = stepContext(current, index);
@@ -43,7 +43,13 @@ export class WorkflowController {
         let turn = await askAgent(instruction, selected, connection, signal, context, progress);
         for (let attempt = 0; attempt < 3 && (turn.needsData || turn.needsFormat); attempt++) {
           if ((!turn.needsData || selected.dataMode === "full") && (!turn.needsFormat || selected.formatMode === "full")) break;
-          selected = await readSelection("full", selected, turn.needsFormat || selected.formatMode === "full");
+          if (turn.needsData) {
+            selected = await readSelection("full", selected, turn.needsFormat || selected.formatMode === "full");
+          } else if (turn.needsFormat) {
+            const previous = selected;
+            const formatted = await readSelection("format", selected);
+            selected = previous.dataMode === "full" ? { ...formatted, values: previous.values, formulas: previous.formulas, dataMode: "full" as const } : formatted;
+          }
           turn = await askAgent(instruction, selected, connection, signal, context, progress);
         }
         if (turn.needsData || turn.needsFormat) throw new Error("模型仍要求补充已有数据，本步骤未执行");
@@ -74,7 +80,7 @@ export class WorkflowController {
   async plan(text: string, signal: AbortSignal, source?: SelectedRange, history: ConversationMessage[] = []): Promise<void> {
     if (this.runner) throw new Error("请先结束当前分步任务，再创建新任务");
     if (text.length > 12000) throw new Error("任务要求过长，请精简后重试");
-    const selected = await readSelection("adaptive", source);
+    const selected = await readSelection("metadata", source);
     const task: Workflow = { version: 1, id: crypto.randomUUID(), task: text, summary: "", anchor: { sheet: selected.sheet, sheetId: selected.sheetId, address: selected.address }, status: "planned", steps: [], watched: [] };
     const guard = await workflowGuard(task);
     this.hooks.stage("正在拆解任务…", true);

@@ -3,7 +3,7 @@
 ## 请求与执行
 
 1. 选区变化事件防抖后只读地址；发送时再捕获选区、工作表 ID 和尺寸，最多读取 100000 格。
-2. 100 格以内首轮读取并发送完整值/公式。超过 100 格首轮只发送地址、尺寸、工作表和单元格数；模型返回 `needs_data:true` 时，插件按首次发送的工作表 ID 与地址读取完整原选区，再发起第二轮请求。格式、清除等不依赖内容的任务只需一轮。
+2. 发送首轮只发送地址、尺寸、工作表和单元格数，不预读单元格值/公式。模型返回 `needs_data:true` 时，插件按首次发送的工作表 ID 与地址读取完整原选区，再发起后续请求；返回 `needs_format:true` 时只读取格式，不读取值/公式。按源行或源区域复制格式使用原生 `copy_formats`，只读取并修改格式，不读取目标区域内容。
 3. 工作窗格使用统一对话入口，无模式选择。askAgent 在同一次请求中判断本轮分析/修改意图及是否需要分步：分析用 read_only:true 和空 operations，修改用结构化操作，依赖任务返回 needs_workflow。parseTurn 拒绝只读混入写入或分步决定；taskpane 将只读约束保持到本轮数据/格式补充结束，下一条用户请求重新判断。有已保存分步任务时输入框强制只读，原任务通过面板管理。所有请求可取消，不设置固定截止时间；最多保存当前窗格最近 10 轮、40000 字符的对话摘要，清除或重开窗格重置。通过供应商预设或自定义 HTTPS Base URL 请求兼容 chat/completions 接口，预设包含 OpenAI、DeepSeek、Qwen、GLM 和 MiniMAX。
 4. 校验操作白名单、地址、矩形数据尺寸、格式参数和累计处理量，不执行任意代码。选区只作为模型上下文，不再作为目标范围边界；值/公式写入限制 2000 格，清除或格式操作允许较大连续区域。
 5. 通过工作表 ID 定位原表，检查保护、复杂区域、同名新表与数据是否过时。
@@ -14,7 +14,7 @@
 
 ## 当前工具
 
-`write_values`、`write_formulas`、`clear_contents`、`clear_formats`、`format_range`、`create_sheet`。精确类型与校验见 `src/tools/protocol.ts`，模型说明见 `src/llm/client.ts`。
+`write_values`、`write_formulas`、`clear_contents`、`clear_formats`、`format_range`、`copy_formats`、`create_sheet`。精确类型与校验见 `src/tools/protocol.ts`，模型说明见 `src/llm/client.ts`。
 
 文字写入对可能被解释为公式的前缀转义；`null` 转成空串以清空，避免 Office.js 将 null 解释为跳过。公式写入单独校验。
 

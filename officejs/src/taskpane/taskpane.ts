@@ -225,12 +225,14 @@ async function send(): Promise<void> {
   let readOnly = Boolean(workflow.runner);
   try {
     status.textContent = "读取选区…";
-    let selected = await readSelection("adaptive");
+    // Start with metadata so formatting requests never pull the selected cell
+    // contents merely to decide whether a format read is needed.
+    let selected = await readSelection("metadata");
     source = selected;
     const captured = performance.now();
     if (controller.signal.aborted) throw new Error("已取消；未修改工作簿");
     append(`你 · ${selected.sheet}!${selected.address}`, text);
-    if (selected.bounds.rows * selected.bounds.cols > 100) status.textContent = `已捕获 ${selected.bounds.rows * selected.bounds.cols} 格；首轮只发送选区信息…`;
+    status.textContent = `已捕获 ${selected.bounds.rows * selected.bounds.cols} 格；首轮只发送选区信息…`;
     let requestRound = 0;
     const progress: Progress = (phase, message) => {
       if (phase === "feedback") { status.textContent = `模型：${message}`; return; }
@@ -255,8 +257,14 @@ async function send(): Promise<void> {
       const needFormat = plan.needsFormat && !formatRead;
       if (!needData && !needFormat) break;
       status.textContent = `模型需要补充${needData ? "单元格数据" : ""}${needData && needFormat ? "和" : ""}${needFormat ? "颜色/格式" : ""}${plan.dataReason || plan.formatReason ? `（${plan.dataReason ?? plan.formatReason}）` : ""}…`;
-      selected = await readSelection("full", selected, needFormat || formatRead);
-      dataRead = true; formatRead = selected.formatMode === "full";
+      if (needData) {
+        selected = await readSelection("full", selected, needFormat || formatRead);
+      } else if (needFormat) {
+        const previous = selected;
+        const formatted = await readSelection("format", selected);
+        selected = previous.dataMode === "full" ? { ...formatted, values: previous.values, formulas: previous.formulas, dataMode: "full" as const } : formatted;
+      }
+      dataRead = selected.dataMode === "full"; formatRead = selected.formatMode === "full";
       if (controller.signal.aborted) throw new Error("已取消；未修改工作簿");
       plan = await ask(selected);
     }

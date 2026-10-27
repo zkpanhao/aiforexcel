@@ -71,6 +71,11 @@ test("selection payload includes per-cell formats only after format capture", ()
   assert.equal("formats" in (selectionPayload(metadata) as any), false);
   const full = { ...selected, formatMode: "full" as const, formats: [[{ fill: "#00FF00", fontColor: "#000000", bold: false, italic: false, underline: "None", numberFormat: "0.00" }]] };
   assert.deepEqual((selectionPayload(full) as any).formats[0][0], full.formats[0][0]);
+  const formatOnly = { ...selected, values: [], formulas: [], dataMode: "metadata" as const, formatMode: "full" as const, formats: full.formats };
+  const formatPayload = selectionPayload(formatOnly) as any;
+  assert.equal(formatPayload.dataMode, "metadata");
+  assert.equal("values" in formatPayload, false);
+  assert.deepEqual(formatPayload.formats[0][0], full.formats[0][0]);
   const column = { ...metadata, selectionKind: "column" as const, selectionLabel: "D:D", address: "D1:D266" };
   const columnPayload = selectionPayload(column) as any;
   assert.equal(columnPayload.kind, "column");

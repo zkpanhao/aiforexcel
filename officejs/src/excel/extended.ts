@@ -176,6 +176,7 @@ export async function prepareExtended(context: Excel.RequestContext, source: Exc
     execute: async (op: ExcelOperation, target: Excel.Range | undefined, created: Excel.Worksheet[], ownerKey: string) => {
       switch (op.kind) {
         case "format_range": applyRangeStyle(target!, op, op.address); break;
+        case "copy_formats": target!.copyFrom(source.getRange(op.sourceAddress), Excel.RangeCopyType.formats); break;
         case "resize_range":
           if (op.rowHeight !== undefined) target!.format.rowHeight = op.rowHeight;
           if (op.columnWidth !== undefined) target!.format.columnWidth = op.columnWidth;

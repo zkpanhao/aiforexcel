@@ -41,14 +41,24 @@ export async function runOfficeSmokeTest(): Promise<string> {
     const border = first.format.borders.getItem(Excel.BorderIndex.edgeBottom);
     range.load(["values", "formulas", "numberFormat"]);
     first.load(["format/font/name", "format/font/size", "format/font/bold", "format/font/color", "format/fill/color", "format/wrapText"]);
-    last.load(["format/font/name", "format/font/size", "format/font/italic"]);
+    last.load(["format/font/name", "format/font/size", "format/font/italic", "format/font/bold"]);
     border.load(["style", "color"]);
     await context.sync();
     return { values: range.values, formulas: range.formulas, numbers: range.numberFormat,
       first: { name: first.format.font.name, size: first.format.font.size, bold: first.format.font.bold, color: first.format.font.color, fill: first.format.fill.color, wrap: first.format.wrapText },
-      last: { name: last.format.font.name, size: last.format.font.size, italic: last.format.font.italic }, border: { style: border.style, color: border.color } };
+      last: { name: last.format.font.name, size: last.format.font.size, italic: last.format.font.italic, bold: last.format.font.bold }, border: { style: border.style, color: border.color } };
   });
   const before = await inspect();
+  const copyPlan = parsePlan(JSON.stringify({ answer: "测试复制格式", operations: [
+    { kind: "copy_formats", sheet: testName, sourceAddress: "A1", address: "A2:B3" },
+  ] }));
+  await applyOperations(copyPlan, selected!);
+  const copied = await inspect();
+  ensure(JSON.stringify(copied.values) === JSON.stringify(before.values) && JSON.stringify(copied.formulas) === JSON.stringify(before.formulas), "Format-only copy changed cell contents");
+  ensure(copied.last.name === copied.first.name && copied.last.size === copied.first.size && copied.last.bold === copied.first.bold, "Native format-only copy did not repeat source format");
+  await undoLast();
+  ensure(JSON.stringify(await inspect()) === JSON.stringify(before), "Format-only copy undo mismatch");
+
   const plan = parsePlan(JSON.stringify({ answer: "测试清除", operations: [
     { kind: "clear_contents", sheet: testName, address: "A1:B3" },
     { kind: "clear_formats", sheet: testName, address: "A1:B3" },
@@ -71,5 +81,5 @@ export async function runOfficeSmokeTest(): Promise<string> {
   await undoLast();
   ensure(JSON.stringify(await inspect()) === JSON.stringify(before), "Second undo mismatch");
   await Excel.run(async context => { context.workbook.worksheets.getItem(testId).delete(); await context.sync(); });
-  return "Passed in native Excel: clear contents/formats; mixed fonts, sizes, colors, fill, wrap, borders, number formats and formula restore; literal text/null writes; format matrix; two undo cycles. Synthetic test sheet removed.";
+  return "Passed in native Excel: format-only copy and undo; clear contents/formats; mixed fonts, sizes, colors, fill, wrap, borders, number formats and formula restore; literal text/null writes; format matrix; three undo cycles. Synthetic test sheet removed.";
 }

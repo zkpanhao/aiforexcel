@@ -68,7 +68,7 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
       if (source.protection.protected || context.workbook.protection.protected) throw new Error("请先解除工作表和工作簿保护");
       if (selected.dataMode !== "metadata" && (JSON.stringify(range.values) !== JSON.stringify(selected.values) || JSON.stringify(range.formulas) !== JSON.stringify(selected.formulas))) throw new Error("等待期间选区内容已改变，本轮未执行，请重新发送");
       if (targets.some(item => item.sheet.protection.protected)) throw new Error("目标工作表受保护，无法执行本轮操作");
-      if (targets.some(item => item.tables.items.length && !["format_range", "resize_range", "create_chart", "create_pivot", "edit_structure"].includes(item.op.kind))) throw new Error("Excel 表格目前仅支持格式调整、图表或透视分析；请将表格转为普通区域后进行其它操作");
+      if (targets.some(item => item.tables.items.length && !["format_range", "copy_formats", "resize_range", "create_chart", "create_pivot", "edit_structure"].includes(item.op.kind))) throw new Error("Excel 表格目前仅支持格式调整、图表或透视分析；请将表格转为普通区域后进行其它操作");
       const pivotContentKinds = ["write_values", "write_formulas", "transform_text", "clear_contents", "sort_range", "filter_range", "clear_filter", "merge_cells", "unmerge_cells"];
       if (targets.some(item => item.pivotTables?.items.length && pivotContentKinds.includes(item.op.kind))) throw new Error("透视表内部只允许修改格式，不允许写入、清除内容、排序、筛选或合并单元格");
       const occupied = targets.filter(item => writesOnly(item.op)).map(item => {

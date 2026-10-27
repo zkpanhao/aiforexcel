@@ -11,6 +11,7 @@ export type ExcelOperation =
   | ({ kind: "transform_text"; sheet: string; address: string } & TextTransform)
   | { kind: "clear_contents" | "clear_formats"; sheet: string; address: string }
   | ({ kind: "format_range"; sheet: string; address: string } & RangeStyle)
+  | { kind: "copy_formats"; sheet: string; sourceAddress: string; address: string }
   | { kind: "resize_range"; sheet: string; address: string; rowHeight?: number; columnWidth?: number; autofitRows?: boolean; autofitColumns?: boolean }
   | { kind: "merge_cells"; sheet: string; address: string; across?: boolean }
   | { kind: "unmerge_cells"; sheet: string; address: string }
@@ -106,7 +107,7 @@ export function parsePlan(raw: string): AgentPlan {
       if (Object.keys(op).some(k => !["kind", "name", "data"].includes(k))) throw new Error("新建工作表包含不支持的参数");
       continue;
     }
-    if (!["write_values", "write_formulas", "transform_text", "clear_contents", "clear_formats", "format_range", "resize_range", "merge_cells", "unmerge_cells", "sort_range", "filter_range", "clear_filter", "conditional_format", "create_chart", "create_pivot", "edit_structure"].includes(String(op.kind))) throw new Error(`不支持的操作：${String(op.kind)}`);
+    if (!["write_values", "write_formulas", "transform_text", "clear_contents", "clear_formats", "format_range", "copy_formats", "resize_range", "merge_cells", "unmerge_cells", "sort_range", "filter_range", "clear_filter", "conditional_format", "create_chart", "create_pivot", "edit_structure"].includes(String(op.kind))) throw new Error(`不支持的操作：${String(op.kind)}`);
     if (typeof op.sheet !== "string" || typeof op.address !== "string") throw new Error("操作缺少工作表或区域");
     const bounds = parseAddress(op.address);
     if (bounds.rows * bounds.cols > RANGE_CELL_LIMIT) throw new Error("目标区域最多 100000 格");
@@ -133,6 +134,12 @@ export function parsePlan(raw: string): AgentPlan {
     }
     if (op.kind === "format_range") {
       allowed.push(...STYLE_KEYS); validateStyle(op);
+    }
+    if (op.kind === "copy_formats") {
+      allowed.push("sourceAddress");
+      if (typeof op.sourceAddress !== "string") throw new Error("复制格式缺少源区域");
+      const sourceBounds = parseAddress(op.sourceAddress);
+      if (sourceBounds.rows * sourceBounds.cols > RANGE_CELL_LIMIT) throw new Error("格式源区域最多 100000 格");
     }
     if (op.kind === "resize_range") {
       allowed.push("rowHeight", "columnWidth", "autofitRows", "autofitColumns");

@@ -38,6 +38,7 @@ test("extended protocol rejects malformed nested parameters, excess scope and de
     { kind: "format_range", ...base, fontSize: 0 }, { kind: "format_range", ...base, fontSize: 410 },
     { kind: "format_range", ...base, borders: [{ edges: "All", script: "x" }] },
     { kind: "format_range", ...base, horizontalAlign: "execute" },
+    { kind: "copy_formats", ...base, sourceAddress: "not-a-range" },
     { kind: "resize_range", ...base, rowHeight: 20, autofitRows: true },
     { kind: "sort_range", ...base, fields: [{ column: 3, ascending: true }], hasHeaders: true },
     { kind: "filter_range", ...base, rules: [{ column: 0, values: ["x"], criterion1: "=x" }] },
@@ -46,6 +47,7 @@ test("extended protocol rejects malformed nested parameters, excess scope and de
     { kind: "create_pivot", ...base, outputSheet: "_AI_backup_x", rows: [], values: [{ field: "x", aggregation: "Sum" }] },
     { kind: "edit_structure", ...base, outputSheet: "副本", action: "run_macro" },
   ]) assert.throws(() => parse([op]));
+  assert.doesNotThrow(() => parse([{ kind: "copy_formats", ...base, sourceAddress: "A1:D1", address: "A2:D100" }]));
   assert.throws(() => parse([{ kind: "edit_structure", ...base, outputSheet: "副本", action: "delete_rows" }, { kind: "clear_contents", ...base }]));
   assert.doesNotThrow(() => validateScope(parse([{ kind: "create_chart", ...base, address: "A1:D4", chartType: "Line", title: "x" }]), { ...base, bounds: parseAddress(base.address) }));
 });
