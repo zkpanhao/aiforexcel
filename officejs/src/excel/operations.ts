@@ -69,7 +69,7 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
       if (selected.dataMode !== "metadata" && (JSON.stringify(range.values) !== JSON.stringify(selected.values) || JSON.stringify(range.formulas) !== JSON.stringify(selected.formulas))) throw new Error("等待期间选区内容已改变，本轮未执行，请重新发送");
       if (targets.some(item => item.sheet.protection.protected)) throw new Error("目标工作表受保护，无法执行本轮操作");
       if (targets.some(item => item.tables.items.length && !["format_range", "copy_formats", "resize_range", "create_chart", "create_pivot", "edit_structure"].includes(item.op.kind))) throw new Error("Excel 表格目前仅支持格式调整、图表或透视分析；请将表格转为普通区域后进行其它操作");
-      const pivotContentKinds = ["write_values", "write_formulas", "transform_text", "clear_contents", "sort_range", "filter_range", "clear_filter", "merge_cells", "unmerge_cells"];
+      const pivotContentKinds = ["write_values", "write_formulas", "copy_visible_values", "transform_text", "clear_contents", "sort_range", "filter_range", "clear_filter", "merge_cells", "unmerge_cells"];
       if (targets.some(item => item.pivotTables?.items.length && pivotContentKinds.includes(item.op.kind))) throw new Error("透视表内部只允许修改格式，不允许写入、清除内容、排序、筛选或合并单元格");
       const occupied = targets.filter(item => writesOnly(item.op)).map(item => {
         const values = item.range.values as unknown[][], formulas = item.range.formulas as unknown[][];
@@ -83,7 +83,7 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
       if (occupied.length) overwriteWarning = `提示：${occupied.map(item => `${item.sheet}!${item.address} 已有 ${item.count} 个非空单元格`).join("；")}，本次写入已覆盖这些内容。`;
       if (targets.some(item => hasRangeEdits && (item.range.hasSpill !== false || item.range.savedAsArray !== false))) throw new Error("暂不修改数组或溢出公式区域，请选择普通区域");
       for (const item of targets) {
-        if (!item.merged.isNullObject && hasRangeEdits && ["sort_range", "filter_range", "clear_filter", "conditional_format", "write_values", "write_formulas", "transform_text"].includes(item.op.kind)) throw new Error("请先拆分目标区域中的合并单元格，再进行数据写入、排序、筛选或条件格式操作");
+        if (!item.merged.isNullObject && hasRangeEdits && ["sort_range", "filter_range", "clear_filter", "conditional_format", "write_values", "write_formulas", "copy_visible_values", "transform_text"].includes(item.op.kind)) throw new Error("请先拆分目标区域中的合并单元格，再进行数据写入、排序、筛选或条件格式操作");
       }
       if (newNames.some(name => sheets.items.some(sheet => sheet.name.toLowerCase() === name.toLowerCase()))) throw new Error("新工作表名称已存在，请换一个名称");
       const pivotConditional = new Set(targets.filter(item => item.pivotTables?.items.length && item.op.kind === "conditional_format").map(item => item.op));

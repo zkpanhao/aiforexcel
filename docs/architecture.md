@@ -14,7 +14,7 @@
 
 ## 当前工具
 
-`write_values`、`write_formulas`、`clear_contents`、`clear_formats`、`format_range`、`copy_formats`、`create_sheet`。精确类型与校验见 `src/tools/protocol.ts`，模型说明见 `src/llm/client.ts`。
+`write_values`、`write_formulas`、`clear_contents`、`clear_formats`、`format_range`、`copy_formats`、`copy_visible_values`、`create_sheet`。精确类型与校验见 `src/tools/protocol.ts`，模型说明见 `src/llm/client.ts`。
 
 文字写入对可能被解释为公式的前缀转义；`null` 转成空串以清空，避免 Office.js 将 null 解释为跳过。公式写入单独校验。
 

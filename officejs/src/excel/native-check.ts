@@ -43,6 +43,15 @@ async function verify(): Promise<void> {
     completed.push(label);
   };
   const initial = await readSelection("full", { sheetId, address: "A1:C4" });
+  stage = "建立可见单元格复制筛选";
+  await Excel.run(async context => { const sheet = context.workbook.worksheets.getItem(sheetId); sheet.autoFilter.apply(sheet.getRange("A1:C4")); sheet.autoFilter.apply(sheet.getRange("A1:C4"), 0, { filterOn: "Values", values: ["甲"] }); await context.sync(); });
+  await run("可见单元格数值化", [{ kind: "copy_visible_values", sourceAddress: "C2:C4", address: "B2:B4" }], async (sheet, context) => {
+    const values = sheet.getRange("B2:B4"), hidden = sheet.getRange("B3"); values.load(["values", "formulas"]); hidden.load("rowHidden"); await context.sync();
+    ensure(JSON.stringify(values.values) === JSON.stringify([[30], [1], [20]]) && values.formulas.every(row => row.every(value => value !== "=C2")), "Visible value copy changed hidden rows or kept formulas");
+    ensure(hidden.rowHidden, "Visible value copy did not preserve the filtered hidden row");
+  });
+  await Excel.run(async context => { context.workbook.worksheets.getItem(sheetId).autoFilter.remove(); await context.sync(); });
+
   let rejected = false;
   try { await applyOperations(parsePlan(JSON.stringify({ answer: "合并保护", operations: [{ kind: "merge_cells", sheet: name, address: "A1:C4" }] })), initial); }
   catch (error) { rejected = error instanceof Error && error.message.includes("丢弃"); }

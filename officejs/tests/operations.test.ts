@@ -21,6 +21,16 @@ function host(failWrite = false, includeTarget = false, includePivot = false) {
     getMergedAreasOrNullObject() { return { isNullObject: true, load() {} }; },
     getTables() { return { items: [], load() {} }; },
     getPivotTables() { return { items: includePivot ? [{}] : [], load() {} }; },
+    getVisibleView() {
+      const current = this;
+      return {
+        rowCount: current.data.length, columnCount: 1,
+        cellAddresses: current.data.map((_: unknown, index: number) => [`A${index + 1}`]),
+        values: current.data,
+        load() {},
+        set(properties: { values?: unknown[][] }) { if (properties.values) queue.push(() => { events.push(`visible:${owner.id}`); current.data = structuredClone(properties.values); }); },
+      };
+    },
     copyFrom(from: any, copyType?: string) { queue.push(() => { events.push(`copy:${owner.id}:${copyType ?? "All"}`); this.data = structuredClone(from.data); this.formats = structuredClone(from.formats); }); },
     clear() { queue.push(() => { events.push(`write:${owner.id}`); this.data = [[""], [""]]; this.formats = ["normal", "normal"]; }); },
   });
@@ -63,6 +73,14 @@ test("copy_formats uses native format-only copy and keeps cell contents", async 
   const plan = parsePlan(JSON.stringify({ answer: "已复制格式", operations: [{ kind: "copy_formats", sheet: "数据", sourceAddress: "A1:A1", address: "A2:A2" }] }));
   await applyOperations(plan, selected);
   assert.ok(h.events.some(event => event.endsWith(":Formats")));
+  assert.deepEqual(h.source.range.data, [[1], [2]]);
+});
+test("copy_visible_values writes static values through the visible view", async () => {
+  const h = host();
+  const selected = { ...h.selected, dataMode: "metadata" as const, values: [], formulas: [] };
+  const plan = parsePlan(JSON.stringify({ answer: "已复制可见值", operations: [{ kind: "copy_visible_values", sheet: "数据", sourceAddress: "A1:A2", address: "A1:A2" }] }));
+  await applyOperations(plan, selected);
+  assert.ok(h.events.some(event => event.startsWith("visible:")));
   assert.deepEqual(h.source.range.data, [[1], [2]]);
 });
 test("snapshot sync precedes mutation; undo restores snapshot and cleans up", async () => {

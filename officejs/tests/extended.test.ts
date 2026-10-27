@@ -10,6 +10,8 @@ test("selection addresses preserve merged rectangle dimensions across column bou
 test("extended operations accept the advertised bounded parameters", () => {
   const operations = [
     { kind: "format_range", ...base, fontName: "微软雅黑", fontSize: 14, italic: true, underline: "Double", horizontalAlign: "Center", verticalAlign: "Top", borders: [{ edges: "All", style: "Continuous", weight: "Thin", color: "#336699" }] },
+    { kind: "copy_formats", ...base, sourceAddress: "A1:C1" },
+    { kind: "copy_visible_values", ...base, sourceAddress: "A1:C4" },
     { kind: "resize_range", ...base, rowHeight: 25, autofitColumns: true },
     { kind: "merge_cells", ...base, across: true }, { kind: "unmerge_cells", ...base },
     { kind: "sort_range", ...base, fields: [{ column: 2, ascending: false }], hasHeaders: true },
@@ -39,6 +41,7 @@ test("extended protocol rejects malformed nested parameters, excess scope and de
     { kind: "format_range", ...base, borders: [{ edges: "All", script: "x" }] },
     { kind: "format_range", ...base, horizontalAlign: "execute" },
     { kind: "copy_formats", ...base, sourceAddress: "not-a-range" },
+    { kind: "copy_visible_values", ...base, sourceAddress: "A1:A2", address: "B1:B3" },
     { kind: "resize_range", ...base, rowHeight: 20, autofitRows: true },
     { kind: "sort_range", ...base, fields: [{ column: 3, ascending: true }], hasHeaders: true },
     { kind: "filter_range", ...base, rules: [{ column: 0, values: ["x"], criterion1: "=x" }] },
