@@ -75,6 +75,16 @@ test("copy_formats uses native format-only copy and keeps cell contents", async 
   assert.ok(h.events.some(event => event.endsWith(":Formats")));
   assert.deepEqual(h.source.range.data, [[1], [2]]);
 });
+test("copy operations can use the selected sheet as source and target another sheet", async () => {
+  const h = host(false, true);
+  const selected = { ...h.selected, dataMode: "metadata" as const, values: [], formulas: [] };
+  const formatPlan = parsePlan(JSON.stringify({ answer: "已复制格式", operations: [{ kind: "copy_formats", sourceSheet: "数据", sheet: "其他", sourceAddress: "A1:A1", address: "A2:A2" }] }));
+  await applyOperations(formatPlan, selected);
+  assert.ok(h.events.some(event => event.endsWith(":Formats")));
+  const visiblePlan = parsePlan(JSON.stringify({ answer: "已复制可见值", operations: [{ kind: "copy_visible_values", sheet: "其他", sourceAddress: "A1:A2", address: "A1:A2" }] }));
+  await applyOperations(visiblePlan, selected);
+  assert.ok(h.events.some(event => event.startsWith("visible:")));
+});
 test("copy_visible_values writes static values through the visible view", async () => {
   const h = host();
   const selected = { ...h.selected, dataMode: "metadata" as const, values: [], formulas: [] };

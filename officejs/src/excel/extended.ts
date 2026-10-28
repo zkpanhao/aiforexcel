@@ -186,17 +186,23 @@ export async function prepareExtended(context: Excel.RequestContext, source: Exc
     execute: async (op: ExcelOperation, target: Excel.Range | undefined, created: Excel.Worksheet[], ownerKey: string) => {
       switch (op.kind) {
         case "format_range": applyRangeStyle(target!, op, op.address); break;
-        case "copy_formats": target!.copyFrom(source.getRange(op.sourceAddress), Excel.RangeCopyType.formats); break;
+        case "copy_formats": {
+          const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          target!.copyFrom(copySource.getRange(op.sourceAddress), Excel.RangeCopyType.formats); break;
+        }
         case "copy_visible_values": {
-          const sourceView = source.getRange(op.sourceAddress).getVisibleView();
+          const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          const sourceView = copySource.getRange(op.sourceAddress).getVisibleView();
           const targetView = target!.getVisibleView();
           sourceView.load(["values", "cellAddresses", "rowCount", "columnCount"]);
           targetView.load(["cellAddresses", "rowCount", "columnCount"]);
           await context.sync();
           if (sourceView.rowCount !== targetView.rowCount || sourceView.columnCount !== targetView.columnCount) throw new Error("源区域与目标区域当前可见行列不一致，未执行可见单元格复制");
-          const sourceRows = sourceView.cellAddresses.map(row => String(row[0]).replace(/\$?[A-Z]+\$?(\d+)$/i, "$1"));
-          const targetRows = targetView.cellAddresses.map(row => String(row[0]).replace(/\$?[A-Z]+\$?(\d+)$/i, "$1"));
-          if (sourceRows.length !== targetRows.length || sourceRows.some((row, index) => row !== targetRows[index])) throw new Error("源区域与目标区域当前可见行不一致，未执行可见单元格复制");
+          if (copySource.name.toLowerCase() === op.sheet.trim().toLowerCase()) {
+            const sourceRows = sourceView.cellAddresses.map(row => String(row[0]).replace(/\$?[A-Z]+\$?(\d+)$/i, "$1"));
+            const targetRows = targetView.cellAddresses.map(row => String(row[0]).replace(/\$?[A-Z]+\$?(\d+)$/i, "$1"));
+            if (sourceRows.length !== targetRows.length || sourceRows.some((row, index) => row !== targetRows[index])) throw new Error("源区域与目标区域当前可见行不一致，未执行可见单元格复制");
+          }
           if (sourceView.rowCount) targetView.set({ values: sourceView.values });
           break;
         }

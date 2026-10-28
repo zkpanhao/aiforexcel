@@ -17,7 +17,9 @@ test("extended operations accept the advertised bounded parameters", () => {
   const operations = [
     { kind: "format_range", ...base, fontName: "微软雅黑", fontSize: 14, italic: true, underline: "Double", horizontalAlign: "Center", verticalAlign: "Top", borders: [{ edges: "All", style: "Continuous", weight: "Thin", color: "#336699" }] },
     { kind: "copy_formats", ...base, sourceAddress: "A1:C1" },
+    { kind: "copy_formats", ...base, sourceSheet: "数据", sourceAddress: "A1:C1" },
     { kind: "copy_visible_values", ...base, sourceAddress: "A1:C4" },
+    { kind: "copy_visible_values", ...base, sourceSheet: "数据", sourceAddress: "A1:C4" },
     { kind: "lookup_replace", ...base, address: "A1:A4", lookupSheet: "111表", lookupAddress: "E15:F24" },
     { kind: "resize_range", ...base, rowHeight: 25, autofitColumns: true },
     { kind: "merge_cells", ...base, across: true }, { kind: "unmerge_cells", ...base },
@@ -48,6 +50,7 @@ test("extended protocol rejects malformed nested parameters, excess scope and de
     { kind: "format_range", ...base, borders: [{ edges: "All", script: "x" }] },
     { kind: "format_range", ...base, horizontalAlign: "execute" },
     { kind: "copy_formats", ...base, sourceAddress: "not-a-range" },
+    { kind: "copy_formats", ...base, sourceSheet: "_AI_backup_test", sourceAddress: "A1:C1" },
     { kind: "copy_visible_values", ...base, sourceAddress: "A1:A2", address: "B1:B3" },
     { kind: "lookup_replace", ...base, address: "A1:B4", lookupSheet: "111表", lookupAddress: "E15:F24" },
     { kind: "resize_range", ...base, rowHeight: 20, autofitRows: true },

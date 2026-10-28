@@ -31,8 +31,11 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
   const previous = getLastUndo();
   let extended: Awaited<ReturnType<typeof prepareExtended>> | undefined;
   const writesOnly = (op: typeof plan.operations[number]) => op.kind === "write_values" || op.kind === "write_formulas";
-  const crossSheetExtended = plan.operations.some(op => op.kind !== "create_sheet" && op.kind !== "transform_text" && !writesOnly(op) && op.sheet !== selected.sheet);
-  if (crossSheetExtended) throw new Error("跨工作表目前只支持写入值或公式；请将格式、筛选、排序等操作单独发送到目标工作表");
+  const crossSheetExtended = plan.operations.some(op => {
+    if (op.kind === "create_sheet" || op.kind === "transform_text" || op.kind === "copy_formats" || op.kind === "copy_visible_values" || writesOnly(op)) return false;
+    return op.sheet !== selected.sheet;
+  });
+  if (crossSheetExtended) throw new Error("跨工作表目前支持写入值、公式、格式复制和可见值复制；请将其它格式、筛选、排序等操作单独发送到目标工作表");
 
   const snapshot: UndoSnapshot = { version: 1, token, sourceSheetId: selected.sheetId, backups, created: newNames.map(name => ({ name })) };
   const state = recoveryState(snapshot);

@@ -11,8 +11,8 @@ export type ExcelOperation =
   | ({ kind: "transform_text"; sheet: string; address: string } & TextTransform)
   | { kind: "clear_contents" | "clear_formats"; sheet: string; address: string }
   | ({ kind: "format_range"; sheet: string; address: string } & RangeStyle)
-  | { kind: "copy_formats"; sheet: string; sourceAddress: string; address: string }
-  | { kind: "copy_visible_values"; sheet: string; sourceAddress: string; address: string }
+  | { kind: "copy_formats"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string }
+  | { kind: "copy_visible_values"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string }
   | { kind: "lookup_replace"; sheet: string; address: string; lookupSheet: string; lookupAddress: string }
   | { kind: "resize_range"; sheet: string; address: string; rowHeight?: number; columnWidth?: number; autofitRows?: boolean; autofitColumns?: boolean }
   | { kind: "merge_cells"; sheet: string; address: string; across?: boolean }
@@ -138,11 +138,12 @@ export function parsePlan(raw: string): AgentPlan {
       allowed.push(...STYLE_KEYS); validateStyle(op);
     }
     if (op.kind === "copy_formats" || op.kind === "copy_visible_values") {
-      allowed.push("sourceAddress");
+      allowed.push("sourceAddress", "sourceSheet");
       if (typeof op.sourceAddress !== "string") throw new Error("复制操作缺少源区域");
       const sourceBounds = parseAddress(op.sourceAddress);
       if (sourceBounds.rows * sourceBounds.cols > RANGE_CELL_LIMIT) throw new Error("复制源区域最多 100000 格");
       if (op.kind === "copy_visible_values" && (sourceBounds.rows !== bounds.rows || sourceBounds.cols !== bounds.cols)) throw new Error("可见单元格复制要求源区域与目标区域尺寸一致");
+      if (op.sourceSheet !== undefined && (typeof op.sourceSheet !== "string" || !op.sourceSheet.trim() || op.sourceSheet.length > 31 || /^_AI_backup_/i.test(op.sourceSheet))) throw new Error("复制源工作表名称无效");
     }
     if (op.kind === "lookup_replace") {
       allowed.push("lookupSheet", "lookupAddress");
