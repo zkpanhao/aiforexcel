@@ -61,7 +61,7 @@ function host(failWrite = false, includeTarget = false, includePivot = false) {
   } };
   (globalThis as any).Excel = {
     run: async (callback: (context: any) => unknown) => callback(context),
-    RangeCopyType: { all: "All", formats: "Formats" }, ClearApplyTo: { contents: "Contents", formats: "Formats" }, SheetVisibility: { visible: "Visible", veryHidden: "VeryHidden" },
+    RangeCopyType: { all: "All", formats: "Formats", values: "Values", formulas: "Formulas" }, ClearApplyTo: { contents: "Contents", formats: "Formats" }, SheetVisibility: { visible: "Visible", veryHidden: "VeryHidden" },
   };
   const selected = { workbook: "test", sheet: source.name, sheetId: source.id, address: "A1:A2", bounds: parseAddress("A1:A2"), values: [[1], [2]], formulas: [[1], [2]] };
   return { source, target, events, sheets, selected };
@@ -92,6 +92,21 @@ test("copy_visible_values writes static values through the visible view", async 
   await applyOperations(plan, selected);
   assert.ok(h.events.some(event => event.startsWith("visible:")));
   assert.deepEqual(h.source.range.data, [[1], [2]]);
+});
+test("native value/formula copy and local comparison do not require model cell data", async () => {
+  const h = host();
+  const selected = { ...h.selected, dataMode: "metadata" as const, values: [], formulas: [] };
+  const plan = parsePlan(JSON.stringify({ answer: "已复制并比较", operations: [
+    { kind: "copy_values", sheet: "数据", sourceAddress: "A1:A2", address: "A1:A2" },
+    { kind: "copy_formulas", sheet: "数据", sourceAddress: "A1:A2", address: "A1:A2" },
+    { kind: "compare_ranges", sheet: "数据", sourceAddress: "A1:A2", address: "A1:A2" },
+  ] }));
+  const report = await applyOperations(plan, selected);
+  assert.match(report ?? "", /比较完成：0 个差异/);
+  assert.ok(h.events.some(event => event.endsWith(":Values")));
+  assert.ok(h.events.some(event => event.endsWith(":Formulas")));
+  assert.equal(canUndo(), true, "含复制写入时仍保留可撤销记录");
+  await undoLast();
 });
 test("snapshot sync precedes mutation; undo restores snapshot and cleans up", async () => {
   const h = host();

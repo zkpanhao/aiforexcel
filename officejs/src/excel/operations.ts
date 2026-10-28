@@ -32,10 +32,10 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
   let extended: Awaited<ReturnType<typeof prepareExtended>> | undefined;
   const writesOnly = (op: typeof plan.operations[number]) => op.kind === "write_values" || op.kind === "write_formulas";
   const crossSheetExtended = plan.operations.some(op => {
-    if (op.kind === "create_sheet" || op.kind === "transform_text" || op.kind === "copy_formats" || op.kind === "copy_visible_values" || writesOnly(op)) return false;
+    if (op.kind === "create_sheet" || op.kind === "transform_text" || op.kind === "copy_formats" || op.kind === "copy_values" || op.kind === "copy_formulas" || op.kind === "copy_visible_values" || op.kind === "fill_range" || op.kind === "transpose" || op.kind === "special_paste" || op.kind === "remove_duplicates" || op.kind === "split_text" || op.kind === "merge_text" || op.kind === "compare_ranges" || writesOnly(op)) return false;
     return op.sheet !== selected.sheet;
   });
-  if (crossSheetExtended) throw new Error("跨工作表目前支持写入值、公式、格式复制和可见值复制；请将其它格式、筛选、排序等操作单独发送到目标工作表");
+  if (crossSheetExtended) throw new Error("跨工作表目前支持写入、复制、填充、转置、去重、文本拆分合并、区域比较和格式复制；请将其它筛选、排序等操作单独发送到目标工作表");
 
   const snapshot: UndoSnapshot = { version: 1, token, sourceSheetId: selected.sheetId, backups, created: newNames.map(name => ({ name })) };
   const state = recoveryState(snapshot);
@@ -64,15 +64,24 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
         item.merged.load("address");
         item.pivotTables?.load("items/name");
         item.range.load(["hasSpill", "savedAsArray"]);
-        if (writesOnly(item.op)) item.range.load(["values", "formulas"]);
+      if (writesOnly(item.op) || ["split_text", "merge_text", "compare_ranges"].includes(item.op.kind)) item.range.load(["values", "formulas"]);
+      });
+      const extraOutputTargets = plan.operations.filter(op => op.kind === "split_text" || op.kind === "merge_text").map(op => {
+        const sheet = sheets.getItem(op.sheet), range = sheet.getRange(op.outputAddress);
+        sheet.load(["name", "id"]); sheet.protection.load("protected");
+        const item = { op, sheet, range, tables: range.getTables(false), merged: range.getMergedAreasOrNullObject(), pivotTables: undefined as undefined };
+        item.tables.load("items/name"); item.merged.load("address"); range.load(["hasSpill", "savedAsArray", "values", "formulas"]);
+        return item;
       });
       await context.sync();
       if (source.name !== selected.sheet) throw new Error("工作表名称已改变，请重新发送");
       if (source.protection.protected || context.workbook.protection.protected) throw new Error("请先解除工作表和工作簿保护");
       if (selected.dataMode !== "metadata" && (JSON.stringify(range.values) !== JSON.stringify(selected.values) || JSON.stringify(range.formulas) !== JSON.stringify(selected.formulas))) throw new Error("等待期间选区内容已改变，本轮未执行，请重新发送");
       if (targets.some(item => item.sheet.protection.protected)) throw new Error("目标工作表受保护，无法执行本轮操作");
-      if (targets.some(item => item.tables.items.length && !["format_range", "copy_formats", "resize_range", "create_chart", "create_pivot", "edit_structure"].includes(item.op.kind))) throw new Error("Excel 表格目前仅支持格式调整、图表或透视分析；请将表格转为普通区域后进行其它操作");
-      const pivotContentKinds = ["write_values", "write_formulas", "copy_visible_values", "lookup_replace", "transform_text", "clear_contents", "sort_range", "filter_range", "clear_filter", "merge_cells", "unmerge_cells"];
+      if (extraOutputTargets.some(item => item.sheet.protection.protected)) throw new Error("输出工作表受保护，无法执行本轮操作");
+      if (targets.some(item => item.tables.items.length && !["format_range", "copy_formats", "copy_values", "copy_formulas", "fill_range", "transpose", "special_paste", "resize_range", "create_chart", "create_pivot", "edit_structure"].includes(item.op.kind))) throw new Error("Excel 表格目前仅支持格式调整、复制、图表或透视分析；请将表格转为普通区域后进行其它操作");
+      if (extraOutputTargets.some(item => item.tables.items.length)) throw new Error("拆分或合并文本的输出区域不能位于 Excel 表格内，请先转为普通区域");
+      const pivotContentKinds = ["write_values", "write_formulas", "copy_visible_values", "copy_values", "copy_formulas", "fill_range", "transpose", "special_paste", "remove_duplicates", "split_text", "merge_text", "lookup_replace", "transform_text", "clear_contents", "sort_range", "filter_range", "clear_filter", "merge_cells", "unmerge_cells"];
       if (targets.some(item => item.pivotTables?.items.length && pivotContentKinds.includes(item.op.kind))) throw new Error("透视表内部只允许修改格式，不允许写入、清除内容、排序、筛选或合并单元格");
       const occupied = targets.filter(item => writesOnly(item.op)).map(item => {
         const values = item.range.values as unknown[][], formulas = item.range.formulas as unknown[][];
@@ -85,9 +94,11 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
       }).filter((item): item is { sheet: string; address: string; count: number } => Boolean(item));
       if (occupied.length) overwriteWarning = `提示：${occupied.map(item => `${item.sheet}!${item.address} 已有 ${item.count} 个非空单元格`).join("；")}，本次写入已覆盖这些内容。`;
       if (targets.some(item => hasRangeEdits && (item.range.hasSpill !== false || item.range.savedAsArray !== false))) throw new Error("暂不修改数组或溢出公式区域，请选择普通区域");
+      if (extraOutputTargets.some(item => hasRangeEdits && (item.range.hasSpill !== false || item.range.savedAsArray !== false))) throw new Error("暂不修改数组或溢出公式区域，请选择普通区域");
       for (const item of targets) {
-        if (!item.merged.isNullObject && hasRangeEdits && ["sort_range", "filter_range", "clear_filter", "conditional_format", "write_values", "write_formulas", "copy_visible_values", "lookup_replace", "transform_text"].includes(item.op.kind)) throw new Error("请先拆分目标区域中的合并单元格，再进行数据写入、排序、筛选或条件格式操作");
+        if (!item.merged.isNullObject && hasRangeEdits && ["sort_range", "filter_range", "clear_filter", "conditional_format", "write_values", "write_formulas", "copy_visible_values", "copy_values", "copy_formulas", "fill_range", "transpose", "special_paste", "remove_duplicates", "split_text", "merge_text", "lookup_replace", "transform_text"].includes(item.op.kind)) throw new Error("请先拆分目标区域中的合并单元格，再进行数据写入、排序、筛选或条件格式操作");
       }
+      if (extraOutputTargets.some(item => !item.merged.isNullObject && hasRangeEdits)) throw new Error("请先拆分输出区域中的合并单元格，再写入拆分或合并后的文本");
       if (newNames.some(name => sheets.items.some(sheet => sheet.name.toLowerCase() === name.toLowerCase()))) throw new Error("新工作表名称已存在，请换一个名称");
       const pivotConditional = new Set(targets.filter(item => item.pivotTables?.items.length && item.op.kind === "conditional_format").map(item => item.op));
       pivotConditional.forEach(op => { if (op.kind === "conditional_format" && !supportsPivotConditional(op.rule)) throw new Error("透视表区域不支持此类条件格式，请改用直接字体或填充格式"); });
@@ -96,15 +107,16 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
       snapshot.extended = extended.snapshot;
       const pivotConditionalQueue: { op: Extract<typeof plan.operations[number], { kind: "conditional_format" }>; target: Excel.Range }[] = [];
       if (hasRangeEdits) {
-        const uniqueTargets = [...new Map(targets.filter(item => editsCells(item.op)).map(item => [`${item.op.sheet}!${item.op.address}`, item])).values()];
+        const uniqueTargets = [...new Map([...targets, ...extraOutputTargets].filter(item => editsCells(item.op)).map(item => [`${item.op.sheet}!${item.op.address}`, item])).values()];
         uniqueTargets.forEach((item, index) => {
           const name = `${backupName}_${index + 1}`;
           const backup = sheets.add(name);
-          backups.push({ name, sheet: item.op.sheet, sheetId: item.sheet.id, address: item.op.address, copyType: item.pivotTables?.items.length ? Excel.RangeCopyType.formats : Excel.RangeCopyType.all });
+          const backupAddress = (item.op.kind === "split_text" || item.op.kind === "merge_text") && item.range !== undefined && item.op.outputAddress && item.op.address !== item.op.outputAddress ? item.op.outputAddress : item.op.address;
+          backups.push({ name, sheet: item.op.sheet, sheetId: item.sheet.id, address: backupAddress, copyType: item.pivotTables?.items.length ? Excel.RangeCopyType.formats : Excel.RangeCopyType.all });
           backup.customProperties.add(OWNER, token);
           backup.load("id");
           // Keep the original coordinates so relative formulas are restored exactly.
-          backup.getRange(item.op.address).copyFrom(item.range, backups[backups.length - 1].copyType);
+          backup.getRange(backupAddress).copyFrom(item.range, backups[backups.length - 1].copyType);
           backup.visibility = Excel.SheetVisibility.veryHidden;
         });
         await context.sync();
@@ -140,7 +152,11 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
           }
           case "clear_contents": target.clear(Excel.ClearApplyTo.contents); break;
           case "clear_formats": target.clear(Excel.ClearApplyTo.formats); break;
-          default: await extended.execute(op, target, created, OWNER); break;
+          default: {
+            const report = await extended.execute(op, target, created, OWNER);
+            if (report) textReports.push(report);
+            break;
+          }
         }
       }
       await context.sync();
@@ -167,6 +183,7 @@ export async function applyOperations(plan: AgentPlan, selected: SelectedRange, 
     throw error;
   }
   overwriteWarning = [overwriteWarning, ...textReports].filter(Boolean).join(" ") || undefined;
+  if (!hasRangeEdits && !newNames.length) { await state.dispose().catch(() => undefined); return overwriteWarning; }
   if (options.retainUndo) return overwriteWarning;
   setLastUndo(state);
   try { await previous?.dispose(); }
