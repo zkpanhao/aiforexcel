@@ -4,6 +4,8 @@
 
 本地安装、更新及回退使用根目录 `manage-local.ps1`。下面的 `npm start` 用于开发测试侧载，不代表所有新工作簿自动加载。
 
+源代码版本和功能变更以 Git 提交及 GitHub 远端为准，不要求每次提交同步维护根目录 `update.md`。本机安装状态以安装目录的 `current.json` 和 `npm run local:status` 为准；`update.md` 仅保留历史安装备忘。
+
 ## 已实现
 
 完整说明见项目文档目录 [`docs/功能清单.md`](../docs/功能清单.md)。
