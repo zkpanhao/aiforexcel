@@ -12,7 +12,15 @@ export type ExcelOperation =
   | { kind: "clear_contents" | "clear_formats"; sheet: string; address: string }
   | ({ kind: "format_range"; sheet: string; address: string } & RangeStyle)
   | { kind: "copy_formats"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string }
+  | { kind: "copy_values" | "copy_formulas"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string; skipBlanks?: boolean; transpose?: boolean }
   | { kind: "copy_visible_values"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string }
+  | { kind: "fill_range"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string; fillType?: "FillDefault" | "FillCopy" | "FillSeries" | "FillFormats" | "FillValues" | "FillDays" | "FillWeekdays" | "FillMonths" | "FillYears" | "LinearTrend" | "GrowthTrend" | "FlashFill" }
+  | { kind: "transpose"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string; copyType?: "All" | "Values" | "Formulas" | "Formats"; skipBlanks?: boolean }
+  | { kind: "remove_duplicates"; sheet: string; address: string; columns: number[]; includesHeader: boolean }
+  | { kind: "split_text"; sheet: string; address: string; outputAddress: string; delimiter: string; trim?: boolean }
+  | { kind: "merge_text"; sheet: string; address: string; outputAddress: string; separator?: string; skipBlanks?: boolean }
+  | { kind: "compare_ranges"; sheet: string; address: string; sourceSheet?: string; sourceAddress: string; compareFormulas?: boolean; ignoreCase?: boolean }
+  | { kind: "special_paste"; sheet: string; sourceSheet?: string; sourceAddress: string; address: string; copyType: "All" | "Values" | "Formulas" | "Formats"; skipBlanks?: boolean; transpose?: boolean }
   | { kind: "lookup_replace"; sheet: string; address: string; lookupSheet: string; lookupAddress: string }
   | { kind: "resize_range"; sheet: string; address: string; rowHeight?: number; columnWidth?: number; autofitRows?: boolean; autofitColumns?: boolean }
   | { kind: "merge_cells"; sheet: string; address: string; across?: boolean }
@@ -109,7 +117,7 @@ export function parsePlan(raw: string): AgentPlan {
       if (Object.keys(op).some(k => !["kind", "name", "data"].includes(k))) throw new Error("新建工作表包含不支持的参数");
       continue;
     }
-    if (!["write_values", "write_formulas", "transform_text", "clear_contents", "clear_formats", "format_range", "copy_formats", "copy_visible_values", "lookup_replace", "resize_range", "merge_cells", "unmerge_cells", "sort_range", "filter_range", "clear_filter", "conditional_format", "create_chart", "create_pivot", "edit_structure"].includes(String(op.kind))) throw new Error(`不支持的操作：${String(op.kind)}`);
+    if (!["write_values", "write_formulas", "transform_text", "clear_contents", "clear_formats", "format_range", "copy_formats", "copy_values", "copy_formulas", "copy_visible_values", "fill_range", "transpose", "remove_duplicates", "split_text", "merge_text", "compare_ranges", "special_paste", "lookup_replace", "resize_range", "merge_cells", "unmerge_cells", "sort_range", "filter_range", "clear_filter", "conditional_format", "create_chart", "create_pivot", "edit_structure"].includes(String(op.kind))) throw new Error(`不支持的操作：${String(op.kind)}`);
     if (typeof op.sheet !== "string" || typeof op.address !== "string") throw new Error("操作缺少工作表或区域");
     const bounds = parseAddress(op.address);
     if (bounds.rows * bounds.cols > RANGE_CELL_LIMIT) throw new Error("目标区域最多 100000 格");
@@ -137,13 +145,37 @@ export function parsePlan(raw: string): AgentPlan {
     if (op.kind === "format_range") {
       allowed.push(...STYLE_KEYS); validateStyle(op);
     }
-    if (op.kind === "copy_formats" || op.kind === "copy_visible_values") {
+    if (["copy_formats", "copy_values", "copy_formulas", "copy_visible_values", "fill_range", "transpose", "special_paste"].includes(String(op.kind))) {
       allowed.push("sourceAddress", "sourceSheet");
       if (typeof op.sourceAddress !== "string") throw new Error("复制操作缺少源区域");
       const sourceBounds = parseAddress(op.sourceAddress);
       if (sourceBounds.rows * sourceBounds.cols > RANGE_CELL_LIMIT) throw new Error("复制源区域最多 100000 格");
-      if (op.kind === "copy_visible_values" && (sourceBounds.rows !== bounds.rows || sourceBounds.cols !== bounds.cols)) throw new Error("可见单元格复制要求源区域与目标区域尺寸一致");
+      if (op.kind === "copy_visible_values" && !op.transpose && (sourceBounds.rows !== bounds.rows || sourceBounds.cols !== bounds.cols)) throw new Error("可见单元格复制要求源区域与目标区域尺寸一致");
+      if (op.kind === "transpose" && (sourceBounds.rows !== bounds.cols || sourceBounds.cols !== bounds.rows)) throw new Error("转置操作要求目标区域行列与源区域相反");
+      if (op.kind === "fill_range" && sourceBounds.rows * sourceBounds.cols > bounds.rows * bounds.cols) throw new Error("填充源区域不能大于目标区域");
+      if (op.kind === "transpose") { allowed.push("copyType", "skipBlanks"); if (op.copyType !== undefined) oneOf(op.copyType, ["All", "Values", "Formulas", "Formats"]); flag(op.skipBlanks); }
+      if (op.kind === "fill_range") { allowed.push("fillType"); if (op.fillType !== undefined) oneOf(op.fillType, ["FillDefault", "FillCopy", "FillSeries", "FillFormats", "FillValues", "FillDays", "FillWeekdays", "FillMonths", "FillYears", "LinearTrend", "GrowthTrend", "FlashFill"]); }
+      if (["copy_values", "copy_formulas", "special_paste"].includes(String(op.kind))) { allowed.push("skipBlanks", "transpose"); flag(op.skipBlanks); flag(op.transpose); }
+      if (op.kind === "special_paste") { allowed.push("copyType"); if (!["All", "Values", "Formulas", "Formats"].includes(String(op.copyType))) throw new Error("特殊粘贴类型无效"); }
       if (op.sourceSheet !== undefined && (typeof op.sourceSheet !== "string" || !op.sourceSheet.trim() || op.sourceSheet.length > 31 || /^_AI_backup_/i.test(op.sourceSheet))) throw new Error("复制源工作表名称无效");
+    }
+    if (op.kind === "remove_duplicates") {
+      allowed.push("columns", "includesHeader"); flag(op.includesHeader);
+      if (!Array.isArray(op.columns) || !op.columns.length || op.columns.length > 50 || op.columns.some(column => !Number.isInteger(column) || column < 0 || column >= bounds.cols) || new Set(op.columns).size !== op.columns.length) throw new Error("去重列无效");
+      if (typeof op.includesHeader !== "boolean") throw new Error("去重必须指定是否包含表头");
+    }
+    if (op.kind === "split_text") {
+      allowed.push("outputAddress", "delimiter", "trim"); flag(op.trim); text(op.delimiter, 100); if (typeof op.outputAddress !== "string") throw new Error("拆分文本缺少输出区域");
+      if (bounds.cols !== 1) throw new Error("拆分文本输入必须是单列区域");
+      const output = parseAddress(op.outputAddress); if (output.rows !== bounds.rows) throw new Error("拆分文本的输入和输出行数必须一致"); if (output.rows * output.cols > RANGE_CELL_LIMIT) throw new Error("拆分输出区域过大");
+    }
+    if (op.kind === "merge_text") {
+      allowed.push("outputAddress", "separator", "skipBlanks"); flag(op.skipBlanks); if (op.separator !== undefined && (typeof op.separator !== "string" || op.separator.length > 100)) throw new Error("合并分隔符无效"); if (typeof op.outputAddress !== "string") throw new Error("合并文本缺少输出区域");
+      const output = parseAddress(op.outputAddress); if (output.rows !== bounds.rows || output.cols !== 1) throw new Error("合并文本输出必须是与输入行数相同的单列");
+    }
+    if (op.kind === "compare_ranges") {
+      allowed.push("sourceAddress", "sourceSheet", "compareFormulas", "ignoreCase"); flag(op.compareFormulas); flag(op.ignoreCase); if (typeof op.sourceAddress !== "string") throw new Error("比较操作缺少源区域");
+      const sourceBounds = parseAddress(op.sourceAddress); if (sourceBounds.rows !== bounds.rows || sourceBounds.cols !== bounds.cols) throw new Error("比较的两个区域尺寸必须一致"); if (op.sourceSheet !== undefined && (typeof op.sourceSheet !== "string" || !op.sourceSheet.trim() || op.sourceSheet.length > 31 || /^_AI_backup_/i.test(op.sourceSheet))) throw new Error("比较源工作表名称无效");
     }
     if (op.kind === "lookup_replace") {
       allowed.push("lookupSheet", "lookupAddress");

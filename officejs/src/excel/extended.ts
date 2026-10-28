@@ -22,7 +22,7 @@ export function outputNames(plan: AgentPlan): string[] {
   return plan.operations.flatMap(op => op.kind === "create_sheet" ? [op.name] : op.kind === "create_pivot" || op.kind === "edit_structure" ? [op.outputSheet] : []);
 }
 export function editsCells(op: ExcelOperation): boolean {
-  return !["create_sheet", "create_pivot", "edit_structure", "create_chart"].includes(op.kind);
+  return !["create_sheet", "create_pivot", "edit_structure", "create_chart", "compare_ranges"].includes(op.kind);
 }
 export function resolveWorksheet(context: Excel.RequestContext, requested: string): Excel.Worksheet {
   const sheets = context.workbook.worksheets;
@@ -183,12 +183,20 @@ export async function prepareExtended(context: Excel.RequestContext, source: Exc
   return {
     snapshot,
     captureCreated: () => { for (const [index, record] of chartRecords.entries()) { record.id = record.proxy.id; snapshot.charts[index].id = record.id; } },
-    execute: async (op: ExcelOperation, target: Excel.Range | undefined, created: Excel.Worksheet[], ownerKey: string) => {
+    execute: async (op: ExcelOperation, target: Excel.Range | undefined, created: Excel.Worksheet[], ownerKey: string): Promise<string | undefined> => {
       switch (op.kind) {
         case "format_range": applyRangeStyle(target!, op, op.address); break;
         case "copy_formats": {
           const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
           target!.copyFrom(copySource.getRange(op.sourceAddress), Excel.RangeCopyType.formats); break;
+        }
+        case "copy_values": {
+          const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          target!.copyFrom(copySource.getRange(op.sourceAddress), Excel.RangeCopyType.values, op.skipBlanks ?? false, op.transpose ?? false); break;
+        }
+        case "copy_formulas": {
+          const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          target!.copyFrom(copySource.getRange(op.sourceAddress), Excel.RangeCopyType.formulas, op.skipBlanks ?? false, op.transpose ?? false); break;
         }
         case "copy_visible_values": {
           const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
@@ -205,6 +213,62 @@ export async function prepareExtended(context: Excel.RequestContext, source: Exc
           }
           if (sourceView.rowCount) targetView.set({ values: sourceView.values });
           break;
+        }
+        case "fill_range": {
+          const fillSource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          fillSource.getRange(op.sourceAddress).autoFill(target!, op.fillType ?? "FillDefault"); break;
+        }
+        case "transpose": {
+          const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          const copyType = (Excel.RangeCopyType as any)[(op.copyType ?? "All").toLowerCase()] ?? op.copyType ?? Excel.RangeCopyType.all;
+          target!.copyFrom(copySource.getRange(op.sourceAddress), copyType, op.skipBlanks ?? false, true); break;
+        }
+        case "special_paste": {
+          const copySource = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          const copyType = (Excel.RangeCopyType as any)[op.copyType.toLowerCase()] ?? op.copyType;
+          target!.copyFrom(copySource.getRange(op.sourceAddress), copyType, op.skipBlanks ?? false, op.transpose ?? false); break;
+        }
+        case "remove_duplicates": {
+          target!.removeDuplicates(op.columns, op.includesHeader); break;
+        }
+        case "split_text": {
+          target!.load("values");
+          await context.sync();
+          const out = parseAddress(op.outputAddress);
+          const rows = (target!.values as unknown[][]).map(row => {
+            const value = row[0] === null || row[0] === undefined ? "" : String(row[0]);
+            const parts = value.split(op.delimiter).map(item => op.trim ? item.trim() : item);
+            if (parts.length > out.cols) throw new Error(`拆分结果超过输出区域列数（需要至少 ${parts.length} 列）`);
+            return Array.from({ length: out.cols }, (_, index) => parts[index] ?? null);
+          });
+          resolveWorksheet(context, op.sheet).getRange(op.outputAddress).values = rows;
+          break;
+        }
+        case "merge_text": {
+          target!.load("values");
+          await context.sync();
+          const separator = op.separator ?? "";
+          const rows = (target!.values as unknown[][]).map(row => [row.filter(value => !op.skipBlanks || (value !== null && value !== undefined && String(value) !== "")).map(value => value === null || value === undefined ? "" : String(value)).join(separator)]);
+          resolveWorksheet(context, op.sheet).getRange(op.outputAddress).values = rows;
+          break;
+        }
+        case "compare_ranges": {
+          const otherSheet = op.sourceSheet ? resolveWorksheet(context, op.sourceSheet) : source;
+          const other = otherSheet.getRange(op.sourceAddress);
+          other.load(op.compareFormulas ? ["values", "formulas"] : ["values"]);
+          target!.load(op.compareFormulas ? ["values", "formulas"] : ["values"]);
+          await context.sync();
+          const left = (target!.values as unknown[][]), right = (other.values as unknown[][]);
+          const leftFormulas = (target! as any).formulas as unknown[][] | undefined, rightFormulas = (other as any).formulas as unknown[][] | undefined;
+          const equal = (a: unknown, b: unknown) => { const x = String(a ?? ""), y = String(b ?? ""); return op.ignoreCase ? x.toLowerCase() === y.toLowerCase() : x === y; };
+          const differences: string[] = [];
+          for (let r = 0; r < left.length; r++) for (let c = 0; c < (left[r]?.length ?? 0); c++) {
+            const valueEqual = equal(left[r]?.[c], right[r]?.[c]);
+            const formulaEqual = !op.compareFormulas || equal(leftFormulas?.[r]?.[c], rightFormulas?.[r]?.[c]);
+            if (!valueEqual || !formulaEqual) differences.push(`${op.address} 第${r + 1}行第${c + 1}列`);
+          }
+          const sample = differences.slice(0, 10).join("、");
+          return `${op.sheet}!${op.address} 与 ${(op.sourceSheet ?? source.name)}!${op.sourceAddress} 比较完成：${differences.length} 个差异${sample ? `（示例：${sample}${differences.length > 10 ? "等" : ""}）` : ""}。`;
         }
         case "lookup_replace": {
           const lookup = resolveWorksheet(context, op.lookupSheet).getRange(op.lookupAddress);
