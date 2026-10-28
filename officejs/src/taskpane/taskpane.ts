@@ -10,6 +10,8 @@ import { CommonCommandList } from "./common-command-list";
 import { Conversation, operationTargets } from "../state/conversation";
 import type { Workflow } from "../state/workflow";
 import type { SelectedRange } from "../excel/selection";
+import type { ExcelOperation } from "../tools/protocol";
+import { reportClientError } from "../state/client-log";
 import { WorkflowController } from "./workflow-controller";
 declare const __HOST_SMOKE_TEST__: boolean;
 
@@ -50,7 +52,7 @@ async function workflowAction(action: (signal: AbortSignal) => Promise<void>, ab
   const previousTask = workflow.runner?.task;
   busy = true; workflowRunning = true; const cancellation = new AbortController(); controller = abortable ? cancellation : undefined; updateButtons();
   try { await action(cancellation.signal); status.textContent = workflow.runner?.task.status === "completed" ? "分步任务已完成" : "分步任务已暂停或结束"; }
-  catch (error) { append("分步任务", error instanceof Error ? error.message : "操作失败，已停止后续步骤"); status.textContent = "分步任务已停止"; }
+  catch (error) { void reportClientError({ stage: "分步任务", error: error instanceof Error ? error.message : "操作失败，已停止后续步骤" }); append("分步任务", error instanceof Error ? error.message : "操作失败，已停止后续步骤"); status.textContent = "分步任务已停止"; }
   finally { const task = workflow.runner?.task ?? previousTask; if (task) rememberWorkflow(task); stopModelStopwatch(); controller = undefined; workflowRunning = false; busy = false; updateButtons(); }
 }
 function queueSettings(action: () => Promise<void>, message: string): void {
@@ -221,6 +223,8 @@ async function send(): Promise<void> {
   let executed = false;
   let source: SelectedRange | undefined;
   let targets: ReturnType<typeof operationTargets> = [];
+  let attemptedOperations: readonly ExcelOperation[] = [];
+  let failureStage = "读取选区";
   const history = conversation.snapshot();
   let readOnly = Boolean(workflow.runner);
   try {
@@ -243,6 +247,7 @@ async function send(): Promise<void> {
     };
     status.textContent = selected.dataMode === "metadata" || selected.formatMode === "metadata" ? "让模型判断是否需要读取数据或格式… 可取消" : "等待模型… 可取消";
     const ask = async (current: typeof selected) => {
+      failureStage = "请求模型";
       requestRound++;
       const turn = await askAgent(text, current, connection, controller!.signal, undefined, progress, history, readOnly);
       readOnly ||= turn.readOnly === true;
@@ -281,9 +286,12 @@ async function send(): Promise<void> {
     const answered = performance.now();
     stopModelStopwatch();
     if (plan.operations.length) {
+      failureStage = "备份并执行操作";
       status.textContent = `正在备份并执行 ${plan.operations.length} 项操作…`;
-      targets = operationTargets(executionPlan(plan));
-      const warning = await applyOperations(executionPlan(plan), selected, { signal: controller!.signal,
+      const currentPlan = executionPlan(plan);
+      attemptedOperations = currentPlan.operations;
+      targets = operationTargets(currentPlan);
+      const warning = await applyOperations(currentPlan, selected, { signal: controller!.signal,
         onProgress: progress => { status.textContent = `正在分批处理 ${progress.completed}/${progress.total} 格… 可取消，取消后恢复本轮修改`; },
       });
       executed = true;
@@ -295,6 +303,7 @@ async function send(): Promise<void> {
     const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}秒`;
     status.textContent = `${executed ? "执行完成" : "回答完成"} · 选区 ${seconds(captured - started)} · 模型 ${seconds(answered - captured)} · 执行 ${seconds(performance.now() - answered)}`;
   } catch (error) {
+    void reportClientError({ stage: failureStage, error: error instanceof Error ? error.message : "操作失败", selected: source ? { sheet: source.sheet, address: source.address } : undefined, operations: attemptedOperations });
     if (workflow.runner) rememberWorkflow(workflow.runner.task);
     conversation.record(text, source, error instanceof RecoveryError ? "recovery_required" : executed ? "applied" : "stopped_not_completed", error instanceof Error ? error.message : "操作失败", targets);
     append(error instanceof RecoveryError ? "需要恢复" : "提示", error instanceof Error ? error.message : "操作失败，请重试");
@@ -314,7 +323,7 @@ undoButton.onclick = () => {
   if (busy || !canUndo()) return;
   busy = true; updateButtons(); status.textContent = "正在恢复…";
   void undoLast().then(warning => { conversation.record("恢复上一步", undefined, "restored", "最近一轮表格修改已恢复，历史执行结果已不代表当前内容"); append("已恢复", warning ?? "已还原上次操作前的选区和本轮新建工作表。"); status.textContent = "就绪"; })
-    .catch((error: Error) => { conversation.record("恢复上一步", undefined, "restore_incomplete", error.message); append("恢复未完成", error.message); status.textContent = "恢复记录已保留"; })
+    .catch((error: Error) => { void reportClientError({ stage: "恢复上一步", error: error.message }); conversation.record("恢复上一步", undefined, "restore_incomplete", error.message); append("恢复未完成", error.message); status.textContent = "恢复记录已保留"; })
     .finally(() => { busy = false; updateButtons(); });
 };
 modelsButton.onclick = () => {

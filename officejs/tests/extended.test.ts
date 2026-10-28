@@ -1,11 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePlan, parseAddress, validateScope, addressFromBounds } from "../src/tools/protocol";
-import { applyRangeStyle, outputNames, editsCells, restoreFilterCriteria } from "../src/excel/extended";
+import { applyRangeStyle, outputNames, editsCells, restoreFilterCriteria, resolveWorksheet } from "../src/excel/extended";
 const base = { sheet: "数据", address: "A1:C4" };
 const parse = (operations: unknown[]) => parsePlan(JSON.stringify({ answer: "", operations }));
 test("selection addresses preserve merged rectangle dimensions across column boundaries", () => {
   for (const address of ["A6:C6", "Z9:AB11", "XFD1048576", "A1"]) assert.equal(addressFromBounds(parseAddress(address)), address);
+});
+test("lookup replacement resolves sheet names locally and reports missing sheets clearly", () => {
+  const context = { workbook: { worksheets: { items: [{ name: "111表" }] } } } as any;
+  assert.equal(resolveWorksheet(context, "111表").name, "111表");
+  assert.equal(resolveWorksheet(context, "111表 ").name, "111表");
+  assert.throws(() => resolveWorksheet(context, "不存在"), /找不到参考工作表/);
 });
 test("extended operations accept the advertised bounded parameters", () => {
   const operations = [

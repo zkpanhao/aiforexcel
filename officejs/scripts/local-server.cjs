@@ -17,6 +17,43 @@ function assetPath(directory, rawUrl) {
   if (!/^\/(?:taskpane\.(?:html|js)|commands\.html|manifest\.xml|assets\/[\w.-]+\.png)$/.test(name)) return null;
   return path.join(directory, name.slice(1));
 }
+function clipped(value, limit) {
+  return typeof value === 'string' && value.trim() ? value.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, limit) : undefined;
+}
+function clientLogRecord(current, data) {
+  const result = { at: new Date().toISOString(), release: current.release, event: 'client-error' };
+  const stage = clipped(data?.stage, 80), error = clipped(data?.error, 1000);
+  if (stage) result.stage = stage;
+  if (error) result.error = error;
+  if (data?.selected && typeof data.selected === 'object') {
+    const selected = { sheet: clipped(data.selected.sheet, 120), address: clipped(data.selected.address, 80) };
+    if (selected.sheet || selected.address) result.selected = selected;
+  }
+  if (Array.isArray(data?.operations)) {
+    result.operations = data.operations.slice(0, 20).flatMap(item => {
+      if (!item || typeof item !== 'object') return [];
+      const operation = { kind: clipped(item.kind, 60) };
+      for (const key of ['sheet', 'address', 'lookupSheet', 'lookupAddress']) {
+        const value = clipped(item[key], 120);
+        if (value) operation[key] = value;
+      }
+      return operation.kind ? [operation] : [];
+    });
+  }
+  return result;
+}
+function appendClientLog(root, record) {
+  const file = path.join(root, 'logs', 'client.log');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  try {
+    if (fs.statSync(file).size > 2 * 1024 * 1024) {
+      const previous = `${file}.1`;
+      try { fs.rmSync(previous, { force: true }); } catch { /* keep the current log if rotation fails */ }
+      try { fs.renameSync(file, previous); } catch { /* keep appending to the current log */ }
+    }
+  } catch { /* the log is created below */ }
+  fs.appendFileSync(file, `${JSON.stringify(record)}\n`, 'utf8');
+}
 function activate(root, release) {
   releasePath(root, release);
   for (const name of ['taskpane.html', 'taskpane.js', 'commands.html', 'manifest.xml']) {
@@ -58,6 +95,19 @@ function createServer(root) {
         });
         return;
       }
+      if (request.url === '/__local/client-log' && request.method === 'POST') {
+        if (request.headers.origin !== 'https://localhost:3000') { response.writeHead(403); return response.end(); }
+        let body = '', tooLarge = false;
+        request.on('data', chunk => { if (body.length < 10000) body += chunk; else tooLarge = true; });
+        request.on('end', () => {
+          try {
+            if (tooLarge) throw new Error('log too large');
+            appendClientLog(root, clientLogRecord(current, JSON.parse(body)));
+            response.writeHead(204); response.end();
+          } catch { response.writeHead(400); response.end(); }
+        });
+        return;
+      }
       if (!['GET', 'HEAD'].includes(request.method)) { response.writeHead(405); return response.end(); }
       const file = assetPath(releasePath(root, current.release), request.url);
       if (!file || !fs.existsSync(file)) { response.writeHead(404); return response.end(); }
@@ -75,4 +125,4 @@ if (require.main === module) {
   // localhost resolves to a loopback address; never bind to the LAN interfaces.
   server.listen(3000, 'localhost', () => console.log(`AI for Excel local host started (${process.pid}).`));
 }
-module.exports = { releasePath, assetPath, activate, createServer };
+module.exports = { releasePath, assetPath, activate, createServer, clientLogRecord };

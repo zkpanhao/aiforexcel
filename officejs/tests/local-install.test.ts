@@ -49,6 +49,9 @@ test("installed host switches complete releases, supports rollback and isolates 
     assert.equal((await request("/__local/ready", "POST", { host: "Excel", supported: true, selectionReady: true, secret: "must-not-be-recorded" }, "https://localhost:3000")).status, 204);
     const ready = JSON.parse(fs.readFileSync(path.join(root, "logs", "office-ready.json"), "utf8"));
     assert.equal(ready.selectionReady, true); assert.equal(ready.release, first); assert.equal(ready.secret, undefined);
+    assert.equal((await request("/__local/client-log", "POST", { stage: "执行操作", error: "请求的资源不存在", selected: { sheet: "店铺汇总-POS", address: "C5:C1610" }, operations: [{ kind: "lookup_replace", sheet: "店铺汇总-POS", address: "C5:C1610", lookupSheet: "111表", lookupAddress: "E15:F24" }], prompt: "不得写入日志" }, "https://localhost:3000")).status, 204);
+    const clientLog = fs.readFileSync(path.join(root, "logs", "client.log"), "utf8");
+    assert.match(clientLog, /请求的资源不存在/); assert.match(clientLog, /lookup_replace/); assert.doesNotMatch(clientLog, /不得写入日志/);
   } finally {
     await new Promise<void>(resolve => server.close(() => resolve()));
     fs.rmSync(root, { recursive: true, force: true });

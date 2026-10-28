@@ -24,6 +24,15 @@ export function outputNames(plan: AgentPlan): string[] {
 export function editsCells(op: ExcelOperation): boolean {
   return !["create_sheet", "create_pivot", "edit_structure", "create_chart"].includes(op.kind);
 }
+export function resolveWorksheet(context: Excel.RequestContext, requested: string): Excel.Worksheet {
+  const sheets = context.workbook.worksheets;
+  const exact = sheets.items.find(sheet => sheet.name === requested);
+  if (exact) return exact;
+  const folded = sheets.items.filter(sheet => sheet.name.toLowerCase() === requested.trim().toLowerCase());
+  if (folded.length === 1) return folded[0];
+  const available = sheets.items.map(sheet => sheet.name).filter(name => !/^_AI_backup_/i.test(name));
+  throw new Error(`找不到参考工作表“${requested}”，请核对工作表名称。${available.length ? `当前工作簿中的工作表：${available.join("、")}` : "当前工作簿没有可用工作表"}`);
+}
 export function applyRangeStyle(target: Excel.Range, op: RangeStyle, address: string): void {
   const font = target.format.font;
   if (op.bold !== undefined) font.bold = op.bold;
@@ -102,6 +111,7 @@ export function afterRestoreExtended(sheet: Excel.Worksheet, state: ExtendedSnap
   }
 }
 export async function prepareExtended(context: Excel.RequestContext, source: Excel.Worksheet, plan: AgentPlan, selected: SelectedRange, token: string) {
+  context.workbook.worksheets.load("items/name");
   const dimensions: { axis: "row" | "column"; index: number; value: number }[] = [];
   const dimensionReads: { axis: "row" | "column"; index: number; range: Excel.Range }[] = [];
   const dimensionKeys = new Set<string>();
@@ -191,7 +201,7 @@ export async function prepareExtended(context: Excel.RequestContext, source: Exc
           break;
         }
         case "lookup_replace": {
-          const lookup = context.workbook.worksheets.getItem(op.lookupSheet).getRange(op.lookupAddress);
+          const lookup = resolveWorksheet(context, op.lookupSheet).getRange(op.lookupAddress);
           lookup.load("values"); target!.load("values");
           await context.sync();
           const mapping = new Map<string, string | number | boolean>();

@@ -6,6 +6,7 @@ const devCerts = require("office-addin-dev-certs");
 const { DefinePlugin } = require("webpack");
 const { handleCommonCommands } = require("./scripts/common-commands.cjs");
 const { handleConnection } = require("./scripts/connection-settings.cjs");
+const { clientLogRecord } = require("./scripts/local-server.cjs");
 const commandRoot = path.join(process.env.USERPROFILE, "AIForExcel", "officejs");
 
 module.exports = async (_env, argv) => ({
@@ -64,6 +65,19 @@ module.exports = async (_env, argv) => ({
             const status = { at: new Date().toISOString(), host: data.host === "Excel" ? "Excel" : "Other", supported: data.supported === true, selectionReady: data.selectionReady === true };
             fs.mkdirSync(path.join(__dirname, "work"), { recursive: true });
             fs.writeFileSync(path.join(__dirname, "work", "office-ready.json"), JSON.stringify(status, null, 2));
+            response.sendStatus(204);
+          } catch { response.sendStatus(400); }
+        });
+      });
+      server.app.post("/__dev/client-log", (request, response) => {
+        if (request.headers.origin !== "https://localhost:3000") return response.sendStatus(403);
+        let body = "";
+        request.on("data", chunk => { body += chunk; if (body.length > 10000) request.destroy(); });
+        request.on("end", () => {
+          try {
+            const data = JSON.parse(body);
+            fs.mkdirSync(path.join(__dirname, "work"), { recursive: true });
+            fs.appendFileSync(path.join(__dirname, "work", "client.log"), `${JSON.stringify(clientLogRecord({ release: "development" }, data))}\n`);
             response.sendStatus(204);
           } catch { response.sendStatus(400); }
         });

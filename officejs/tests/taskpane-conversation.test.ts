@@ -79,6 +79,7 @@ async function pane(commandFiles: CommandFiles = { readFileCommands: async () =>
       state.undo = false; state.restored++;
     } },
     "../state/settings": settings, "../state/conversation": conversation,
+    "../state/client-log": { reportClientError: async () => {} },
     "../state/common-commands": { updateFileCommand: async (_command: string, replacement: string) => [replacement], deleteFileCommand: async () => [], ...commandFiles },
     './common-command-list': { CommonCommandList },
     "../state/connection-file": connectionFile,
