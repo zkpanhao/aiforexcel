@@ -371,7 +371,7 @@ Office.onReady(async info => {
   await restoreConnection();
   ready = true; updateButtons();
   await refreshCommonCommands();
-  append("助手", "直接输入分析问题或表格修改要求，可连续追问。只询问或分析时直接回答；要求修改时执行操作，必要时自动分步处理。点击“清除对话”开始新对话。直接处理的恢复记录仅在当前窗格有效；分步进度随工作簿保存。");
+  append("助手", "直接输入你想完成的事情，尽量说明目标区域、条件和结果；助手会先读取需要的数据，再执行修改并保留恢复记录。示例：\n1. 写公式：在 O 列计算 M 列占 N 列的比例。\n2. 批量填充：把 A 列城市所属的省份填入 B 列。\n3. 设置格式：把销售额大于 10 万的整行标为浅黄色。\n4. 整理数据：按日期从早到晚排序当前表格，并保留表头。\n只询问或分析时助手会直接回答；要求修改时会执行操作，必要时自动分步处理。可连续追问，点击“清除对话”开始新对话。直接处理的恢复记录仅在当前窗格有效；分步进度随工作簿保存。");
   try { workflow.load(); if (workflow.runner) rememberWorkflow(workflow.runner.task); updateButtons(); }
   catch (error) { append("任务进度", error instanceof Error ? error.message : "无法读取任务进度"); }
   let timer: ReturnType<typeof setTimeout> | undefined;

@@ -134,6 +134,15 @@ test("pane confirms file save only after success and reloads commands without cl
   assert.equal(h.state.undo, true);
 });
 
+test("pane welcome message explains common conversation examples", async () => {
+  const h = await pane();
+  const welcome = h.element("messages").children[0].children[1].textContent;
+  assert.match(welcome, /写公式：在 O 列计算 M 列占 N 列的比例/);
+  assert.match(welcome, /把 A 列城市所属的省份填入 B 列/);
+  assert.match(welcome, /销售额大于 10 万的整行标为浅黄色/);
+  assert.match(welcome, /按日期从早到晚排序当前表格/);
+});
+
 test('right-click edits/deletes the clicked command, preserves draft/undo and persists exact target', async () => {
   let commands = ['第一条', '第二条\n多行'];
   const updates: string[][] = [], deletes: string[] = [];
@@ -306,5 +315,14 @@ test("model can request and receive supplemental ranges outside the current sele
 test("unified HTML contains the clear button and no mode selector", () => {
   const html = fs.readFileSync(path.join(__dirname, "../src/taskpane/taskpane.html"), "utf8");
   assert.doesNotMatch(html, /id="mode"|工作模式/);
+  assert.doesNotMatch(html, /<strong>AI for Excel<\/strong>/);
+  assert.doesNotMatch(html, /<header/);
+  assert.match(html, /class="conversation-actions"><span id="selection"[^>]*>.*<button id="clearConversation"/s);
   assert.match(html, /id="clearConversation"[^>]*>清除对话/);
+  assert.match(html, /id="undo"[^>]*>恢复<\/button>/);
+  assert.match(html, /id="commonCommands"[^>]*>常用<\/button>/);
+  assert.match(html, /id="saveCommonCommand"[^>]*>保存<\/button>/);
+  assert.doesNotMatch(html, /id="undo"[^>]*>恢复上一步<\/button>/);
+  assert.doesNotMatch(html, /id="commonCommands"[^>]*>常用命令<\/button>/);
+  assert.doesNotMatch(html, /id="saveCommonCommand"[^>]*>保存常用命令<\/button>/);
 });

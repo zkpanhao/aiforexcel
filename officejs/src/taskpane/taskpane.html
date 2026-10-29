@@ -8,12 +8,11 @@
   </head>
   <body>
     <main class="app">
-      <header><strong>AI for Excel</strong><span id="selection">未选择区域</span></header>
       <section id="messages" class="messages" role="log" aria-live="polite"></section>
-      <div class="conversation-actions"><button id="clearConversation" class="secondary">清除对话</button></div>
+      <div class="conversation-actions"><span id="selection" class="selection-label">未选择区域</span><button id="clearConversation" class="secondary">清除对话</button></div>
       <section id="workflowPanel" class="workflow" aria-label="分步任务进度" hidden></section>
       <textarea id="prompt" aria-label="分析问题或修改要求" placeholder="输入分析问题或修改要求，可连续追问（Ctrl+Enter 发送）"></textarea>
-      <div class="actions"><button id="send" disabled>发送</button><button id="undo" disabled title="还原最近一轮实际修改的区域；会覆盖这些区域后续的手动编辑">恢复上一步</button><button id="commonCommands" class="secondary" type="button">常用命令</button><button id="saveCommonCommand" class="secondary" type="button">保存常用命令</button><button id="cancel" hidden>取消</button></div>
+      <div class="actions"><button id="send" disabled>发送</button><button id="undo" disabled title="恢复最近一轮实际修改的区域；会覆盖这些区域后续的手动编辑">恢复</button><button id="commonCommands" class="secondary" type="button" title="打开常用命令">常用</button><button id="saveCommonCommand" class="secondary" type="button" title="将当前输入保存为常用命令">保存</button><button id="cancel" hidden>取消</button></div>
       <div id="commonCommandList" class="common-command-list" hidden role="group" aria-label="常用命令，点击使用，右键修改或删除"></div>
       <div id="commandMenu" class="command-menu" role="menu" aria-label="常用命令操作" hidden>
         <button id="commandEdit" type="button" role="menuitem">修改</button>

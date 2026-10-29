@@ -2,16 +2,15 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: #f7f9fc; }
 .app { display: flex; flex-direction: column; gap: 10px; height: 100vh; padding: 12px; }
-header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
-header span, small { color: #687386; font-size: 12px; overflow-wrap: anywhere; }
-header span { max-width: 55%; text-align: right; }
 .messages { flex: 1; overflow: auto; background: white; border: 1px solid #d9dee8; border-radius: 8px; padding: 10px; white-space: pre-wrap; }
 textarea { min-height: 64px; max-height: 160px; resize: vertical; border: 1px solid #c9d1df; border-radius: 8px; padding: 8px; font: inherit; }
 .messages { min-height: 80px; font-size: 13px; overflow-wrap: anywhere; }
 .messages p { margin: 4px 0 14px; }
-.conversation-actions { display: flex; justify-content: flex-end; }
+.conversation-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.selection-label { min-width: 0; color: #687386; font-size: 12px; overflow-wrap: anywhere; }
 .conversation-actions .secondary { margin-top: 0; }
-.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions { display: flex; gap: 6px; flex-wrap: nowrap; }
+.actions button { flex: 1 1 0; min-width: 0; padding: 8px 6px; white-space: nowrap; }
 .actions .secondary { margin-top: 0; }
 .common-command-list { flex-shrink: 0; max-height: 160px; overflow: auto; padding: 4px; background: #fff; border: 1px solid #c9d1df; border-radius: 6px; }
 .common-command-list .common-command-item { display: block; width: 100%; text-align: left; background: transparent; color: #25496f; padding: 7px 8px; overflow-wrap: anywhere; font: inherit; font-size: 12px; }
