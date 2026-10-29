@@ -66,7 +66,7 @@ async function pane(commandFiles: CommandFiles = { readFileCommands: async () =>
   let controller!: WorkflowController;
   const modules: Record<string, unknown> = {
     "./taskpane.css": {},
-    "../excel/selection": { readSelection: async () => state.selected },
+    "../excel/selection": { readSelection: async () => state.selected, readSupplementalRanges: async (ranges: { sheet: string; address: string }[]) => ranges.map(range => ({ ...state.selected, sheet: range.sheet, sheetId: range.sheet, address: range.address, bounds: parseAddress(range.address), values: [[`${range.sheet}!${range.address}`]], formulas: [[""]] })) },
     "../excel/operations": { RecoveryError, applyOperations: async () => {
       if (state.failApply) throw new Error("写入失败，已回退");
       state.undo = true; state.applied++;
@@ -289,6 +289,18 @@ test("read-only decision stays locked through data supplementation and resets fo
   assert.equal(h.state.applied, 0);
   await h.send("现在修改");
   assert.equal(h.calls[2].readOnly, false); assert.equal(h.state.applied, 1);
+});
+test("model can request and receive supplemental ranges outside the current selection", async () => {
+  const h = await pane();
+  h.state.selected = { ...h.state.selected, values: [], formulas: [], dataMode: "metadata" as any };
+  h.state.turns.push(
+    { answer: "需要指定区域", needsData: true, dataRanges: [{ sheet: "数据", address: "L273" }], operations: [] },
+    { answer: "已检查 L273", needsData: false, operations: [] },
+  );
+  await h.send("检查 L273");
+  assert.equal(h.calls.length, 2);
+  assert.equal(h.calls[1].selected.supplementalRanges[0].address, "L273");
+  assert.deepEqual(h.calls[1].selected.supplementalRanges[0].values, [["数据!L273"]]);
 });
 
 test("unified HTML contains the clear button and no mode selector", () => {

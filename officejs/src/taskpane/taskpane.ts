@@ -1,7 +1,7 @@
 import "./taskpane.css";
-import { readSelection } from "../excel/selection";
+import { readSelection, readSupplementalRanges } from "../excel/selection";
 import { applyOperations, RecoveryError } from "../excel/operations";
-import { askAgent, executionPlan, inferProvider, listModels, providerPreset, PROVIDER_PRESETS, ProviderId, Progress } from "../llm/client";
+import { askAgent, DataRangeRequest, executionPlan, inferProvider, listModels, providerPreset, PROVIDER_PRESETS, ProviderId, Progress } from "../llm/client";
 import { canUndo, undoLast } from "../state/undo";
 import { canonicalBaseUrl } from "../state/settings";
 import { readFileConnection, saveFileConnection, forgetFileKey } from "../state/connection-file";
@@ -215,6 +215,7 @@ async function refreshSelection(): Promise<void> {
     selectionLabel.textContent = range.address;
   });
 }
+function rangeKey(range: DataRangeRequest): string { return `${range.sheet}\u0000${range.address.toUpperCase()}`; }
 async function send(): Promise<void> {
   if (busy || commandsBusy || settingsPending || !ready || !prompt.value.trim()) return;
   const text = prompt.value.trim(), connection = config();
@@ -255,19 +256,30 @@ async function send(): Promise<void> {
       return turn;
     };
     let dataRead = selected.dataMode === "full", formatRead = selected.formatMode === "full";
+    const readRanges = new Set<string>();
     startModelStopwatch();
     let plan = await ask(selected);
     for (let attempt = 0; attempt < 3 && (plan.needsData || plan.needsFormat); attempt++) {
-      const needData = plan.needsData && !dataRead;
+      const requestedRanges = plan.dataRanges ?? [];
+      const missingRanges = requestedRanges.filter(range => !readRanges.has(rangeKey(range)));
+      const needData = plan.needsData && (!requestedRanges.length ? !dataRead : missingRanges.length > 0);
       const needFormat = plan.needsFormat && !formatRead;
       if (!needData && !needFormat) break;
       status.textContent = `模型需要补充${needData ? "单元格数据" : ""}${needData && needFormat ? "和" : ""}${needFormat ? "颜色/格式" : ""}${plan.dataReason || plan.formatReason ? `（${plan.dataReason ?? plan.formatReason}）` : ""}…`;
       if (needData) {
-        selected = await readSelection("full", selected, needFormat || formatRead);
+        if (missingRanges.length) {
+          const supplemental = await readSupplementalRanges(missingRanges);
+          selected = { ...selected, supplementalRanges: [...(selected.supplementalRanges ?? []), ...supplemental] };
+          missingRanges.forEach(range => readRanges.add(rangeKey(range)));
+        } else {
+          const supplementalRanges = selected.supplementalRanges;
+          const refreshed = await readSelection("full", selected, needFormat || formatRead);
+          selected = supplementalRanges?.length ? { ...refreshed, supplementalRanges } : refreshed;
+        }
       } else if (needFormat) {
         const previous = selected;
         const formatted = await readSelection("format", selected);
-        selected = previous.dataMode === "full" ? { ...formatted, values: previous.values, formulas: previous.formulas, dataMode: "full" as const } : formatted;
+        selected = { ...formatted, ...(previous.dataMode === "full" ? { values: previous.values, formulas: previous.formulas, dataMode: "full" as const } : {}), ...(previous.supplementalRanges?.length ? { supplementalRanges: previous.supplementalRanges } : {}) };
       }
       dataRead = selected.dataMode === "full"; formatRead = selected.formatMode === "full";
       if (controller.signal.aborted) throw new Error("已取消；未修改工作簿");

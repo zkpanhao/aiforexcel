@@ -5,12 +5,18 @@ export interface SelectedRange {
   dataMode: "full" | "metadata";
   formatMode?: "full" | "metadata";
   formats?: CellFormat[][];
+  supplementalRanges?: SupplementalRange[];
   selectionKind?: "range" | "column" | "row";
   selectionLabel?: string;
 }
 export interface CellFormat {
   fill: string | null; fontColor: string | null; bold: boolean | null; italic: boolean | null;
   underline: string | null; numberFormat: string | null;
+}
+export interface SupplementalRange {
+  workbook: string; sheet: string; sheetId: string; address: string; bounds: Bounds;
+  values: (string | number | boolean | null)[][];
+  formulas: (string | number | boolean | null)[][];
 }
 export const MAX_READ_CELLS = 100000;
 export const MAX_FORMAT_CELLS = 10000;
@@ -54,6 +60,15 @@ export async function readSelection(mode: ReadMode = "adaptive", target?: { shee
     const formats = await readFormats(context, effective);
     return { ...base, values: effective.values, formulas: effective.formulas, dataMode: "full" as const, formatMode: "full" as const, formats };
   });
+}
+
+export async function readSupplementalRanges(ranges: readonly { sheet: string; address: string }[]): Promise<SupplementalRange[]> {
+  const results: SupplementalRange[] = [];
+  for (const request of ranges) {
+    const selected = await readSelection("full", { sheetId: request.sheet, address: request.address });
+    results.push({ workbook: selected.workbook, sheet: selected.sheet, sheetId: selected.sheetId, address: selected.address, bounds: selected.bounds, values: selected.values, formulas: selected.formulas });
+  }
+  return results;
 }
 
 async function readFormats(context: Excel.RequestContext, effective: Excel.Range): Promise<CellFormat[][]> {

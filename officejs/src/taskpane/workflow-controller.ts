@@ -1,7 +1,7 @@
 import { askAgent, Connection, ConversationMessage, executionPlan } from "../llm/client";
 import { checkStep, planWorkflow, stepContext } from "../llm/workflow";
 import { applyOperations } from "../excel/operations";
-import { readSelection, SelectedRange } from "../excel/selection";
+import { readSelection, readSupplementalRanges, SelectedRange } from "../excel/selection";
 import { recoveryState } from "../excel/recovery";
 import { inspectStep, WorkbookChangedError, workflowGuard } from "../excel/workflow-observation";
 import { Workflow, WorkflowRunner } from "../state/workflow";
@@ -41,14 +41,25 @@ export class WorkflowController {
         const instruction = `${step.instruction}${step.correction ? `\n用户对本步骤的修正：${step.correction}` : ""}`;
         this.hooks.stage(`第 ${index + 1} 步：模型生成操作…`, true);
         let turn = await askAgent(instruction, selected, connection, signal, context, progress);
+        const readRanges = new Set<string>();
         for (let attempt = 0; attempt < 3 && (turn.needsData || turn.needsFormat); attempt++) {
-          if ((!turn.needsData || selected.dataMode === "full") && (!turn.needsFormat || selected.formatMode === "full")) break;
+          const requestedRanges = turn.dataRanges ?? [];
+          const missingRanges = requestedRanges.filter(range => !readRanges.has(`${range.sheet}\u0000${range.address.toUpperCase()}`));
+          if ((!turn.needsData || (!requestedRanges.length ? selected.dataMode === "full" : missingRanges.length === 0)) && (!turn.needsFormat || selected.formatMode === "full")) break;
           if (turn.needsData) {
-            selected = await readSelection("full", selected, turn.needsFormat || selected.formatMode === "full");
+            if (missingRanges.length) {
+              const supplemental = await readSupplementalRanges(missingRanges);
+              selected = { ...selected, supplementalRanges: [...(selected.supplementalRanges ?? []), ...supplemental] };
+              missingRanges.forEach(range => readRanges.add(`${range.sheet}\u0000${range.address.toUpperCase()}`));
+            } else {
+              const supplementalRanges = selected.supplementalRanges;
+              const refreshed = await readSelection("full", selected, turn.needsFormat || selected.formatMode === "full");
+              selected = supplementalRanges?.length ? { ...refreshed, supplementalRanges } : refreshed;
+            }
           } else if (turn.needsFormat) {
             const previous = selected;
             const formatted = await readSelection("format", selected);
-            selected = previous.dataMode === "full" ? { ...formatted, values: previous.values, formulas: previous.formulas, dataMode: "full" as const } : formatted;
+            selected = { ...formatted, ...(previous.dataMode === "full" ? { values: previous.values, formulas: previous.formulas, dataMode: "full" as const } : {}), ...(previous.supplementalRanges?.length ? { supplementalRanges: previous.supplementalRanges } : {}) };
           }
           turn = await askAgent(instruction, selected, connection, signal, context, progress);
         }

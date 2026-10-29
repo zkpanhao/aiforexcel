@@ -82,11 +82,29 @@ test("selection payload includes per-cell formats only after format capture", ()
   assert.equal(columnPayload.label, "D:D");
   assert.equal(columnPayload.address, "D1:D266");
 });
+test("selection payload includes supplemental range values and formulas", () => {
+  const payload = selectionPayload({ ...selected, dataMode: "metadata", supplementalRanges: [{ ...selected, address: "L273", bounds: parseAddress("L273"), values: [["2026-11-01"]], formulas: [[""]] }] }) as any;
+  assert.equal(payload.dataMode, "metadata");
+  assert.equal(payload.supplemental_ranges[0].sheet, selected.sheet);
+  assert.equal(payload.supplemental_ranges[0].address, "L273");
+  assert.deepEqual(payload.supplemental_ranges[0].values, [["2026-11-01"]]);
+});
 test("parseTurn accepts a data request and rejects mixed request plus operations", () => {
   const turn = parseTurn('{"answer":"需要读取内容","needs_data":true,"data_request":{"reason":"需要查找具体值"},"operations":[]}');
   assert.equal(turn.needsData, true);
   assert.equal(turn.dataReason, "需要查找具体值");
   assert.throws(() => parseTurn('{"answer":"读取","needs_data":true,"data_request":{"reason":"查找"},"operations":[{"kind":"clear_contents","sheet":"Sheet1","address":"A1"}]}'), /不能同时执行操作/);
+});
+test("parseTurn accepts explicit supplemental data ranges", () => {
+  const turn = parseTurn('{"answer":"需要读取指定区域","needs_data":true,"data_request":{"reason":"检查 L273 和日期行","ranges":[{"sheet":"预估收入目标","address":"L273"},{"sheet":"预估收入目标","address":"A2:BN2"}]},"operations":[]}');
+  assert.deepEqual(turn.dataRanges, [
+    { sheet: "预估收入目标", address: "L273" },
+    { sheet: "预估收入目标", address: "A2:BN2" },
+  ]);
+});
+test("parseTurn rejects invalid or oversized supplemental data ranges", () => {
+  assert.throws(() => parseTurn('{"answer":"读取","needs_data":true,"data_request":{"reason":"查找","ranges":[{"sheet":"Sheet1","address":"A0"}]},"operations":[]}'), /连续区域/);
+  assert.throws(() => parseTurn('{"answer":"读取","needs_data":true,"data_request":{"reason":"查找","ranges":[{"sheet":"Sheet1","address":"A1:CV100000"}]},"operations":[]}'), /100000/);
 });
 test("parseTurn validates data_request reason", () => {
   assert.throws(() => parseTurn('{"answer":"读取","needs_data":true,"data_request":{"reason":1},"operations":[]}'), /data_request/);
