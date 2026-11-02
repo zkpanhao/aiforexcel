@@ -12,6 +12,7 @@ import type { Workflow } from "../state/workflow";
 import type { SelectedRange } from "../excel/selection";
 import type { ExcelOperation } from "../tools/protocol";
 import { reportClientError } from "../state/client-log";
+import { userFacingError } from "../state/user-error";
 import { WorkflowController } from "./workflow-controller";
 declare const __HOST_SMOKE_TEST__: boolean;
 
@@ -315,10 +316,11 @@ async function send(): Promise<void> {
     const seconds = (ms: number) => `${(ms / 1000).toFixed(1)}秒`;
     status.textContent = `${executed ? "执行完成" : "回答完成"} · 选区 ${seconds(captured - started)} · 模型 ${seconds(answered - captured)} · 执行 ${seconds(performance.now() - answered)}`;
   } catch (error) {
+    const message = userFacingError(error, source);
     void reportClientError({ stage: failureStage, error: error instanceof Error ? error.message : "操作失败", selected: source ? { sheet: source.sheet, address: source.address } : undefined, operations: attemptedOperations });
     if (workflow.runner) rememberWorkflow(workflow.runner.task);
-    conversation.record(text, source, error instanceof RecoveryError ? "recovery_required" : executed ? "applied" : "stopped_not_completed", error instanceof Error ? error.message : "操作失败", targets);
-    append(error instanceof RecoveryError ? "需要恢复" : "提示", error instanceof Error ? error.message : "操作失败，请重试");
+    conversation.record(text, source, error instanceof RecoveryError ? "recovery_required" : executed ? "applied" : "stopped_not_completed", message, targets);
+    append(error instanceof RecoveryError ? "需要恢复" : "提示", message);
     status.textContent = executed ? "修改已完成" : "本轮已停止";
   } finally { stopModelStopwatch(); controller = undefined; workflowRunning = false; busy = false; updateButtons(); }
 }

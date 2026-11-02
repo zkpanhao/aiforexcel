@@ -9,6 +9,7 @@ import * as settings from "../src/state/settings";
 import * as conversation from "../src/state/conversation";
 import { parseAddress } from "../src/tools/protocol";
 import { CommonCommandList } from '../src/taskpane/common-command-list';
+import { userFacingError } from "../src/state/user-error";
 
 // Exercise the actual pane handlers with an isolated DOM and workbook adapter.
 // No browser package, model requests, user storage or real workbook is involved.
@@ -80,6 +81,7 @@ async function pane(commandFiles: CommandFiles = { readFileCommands: async () =>
     } },
     "../state/settings": settings, "../state/conversation": conversation,
     "../state/client-log": { reportClientError: async () => {} },
+    "../state/user-error": { userFacingError },
     "../state/common-commands": { updateFileCommand: async (_command: string, replacement: string) => [replacement], deleteFileCommand: async () => [], ...commandFiles },
     './common-command-list': { CommonCommandList },
     "../state/connection-file": connectionFile,
