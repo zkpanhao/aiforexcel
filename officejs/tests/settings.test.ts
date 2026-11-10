@@ -6,7 +6,7 @@ function memoryStorage() {
   const values = new Map<string, string>();
   return { values, getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
 }
-const settings = { provider: "custom" as const, baseUrl: "https://jxai.keloom.com/v1", model: "gpt-6.1-sol", apiKey: "test-only-credential", rememberKey: true };
+const settings = { provider: "custom" as const, baseUrl: "https://example.com/v1", model: "test-model", apiKey: "test-only-credential", rememberKey: true };
 test("reopening settings restores remembered key, endpoint and model", () => {
   const storage = memoryStorage(); saveConnection(storage, settings);
   assert.deepEqual(loadConnection(storage), settings);
@@ -30,7 +30,7 @@ test("forgetting keeps address and model but removes key and consent", () => {
 test("a key stored for a different endpoint is not restored", () => {
   const storage = memoryStorage(); saveConnection(storage, settings);
   const key = [...storage.values.keys()][0];
-  const stored = JSON.parse(storage.values.get(key)!); stored.baseUrl = "https://example.com/v1";
+  const stored = JSON.parse(storage.values.get(key)!); stored.baseUrl = "https://other.example/v1";
   storage.setItem(key, JSON.stringify(stored));
   assert.equal(loadConnection(storage)?.apiKey, "");
 });

@@ -50,3 +50,10 @@ Desktop.ini
 
 # Personal development notes (local only; never sync to GitHub)
 /.local/
+/update.md
+/docs/AGENTS.md
+/docs/TODO.md
+/docs/UPLOAD_RULES.md
+/docs/collaboration.md
+/docs/development-log.md
+/docs/testing.md

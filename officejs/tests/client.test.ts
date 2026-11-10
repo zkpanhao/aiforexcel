@@ -4,7 +4,7 @@ import { askAgent, askAnalysis, endpoint, executionPlan, listModels, parseTurn, 
 import { parseAddress } from "../src/tools/protocol";
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
-const config = { baseUrl: "https://jxai.keloom.com/v1", model: "gpt-6.1-sol", apiKey: "test-only-not-a-real-key" };
+const config = { baseUrl: "https://example.com/v1", model: "test-model", apiKey: "test-only-not-a-real-key" };
 const selected = { workbook: "test", sheet: "Sheet1", sheetId: "id", address: "A1", bounds: parseAddress("A1"), values: [[1]], formulas: [[1]], dataMode: "full" as const };
 test("built-in providers use their documented compatible API base URLs", () => {
   assert.deepEqual(PROVIDER_PRESETS.filter(item => item.id !== "custom").map(item => [item.id, item.baseUrl]), [
@@ -16,12 +16,12 @@ test("built-in providers use their documented compatible API base URLs", () => {
   ]);
 });
 test("endpoints use configured base and reject credentials or insecure remote URL", () => {
-  assert.equal(endpoint(config.baseUrl, "models"), "https://jxai.keloom.com/v1/models");
+  assert.equal(endpoint(config.baseUrl, "models"), "https://example.com/v1/models");
   for (const url of ["http://example.com", "https://user:key@example.com", "https://example.com?key=x"]) assert.throws(() => endpoint(url, "models"));
 });
 test("send selected data, use exact configured model, avoid unsupported temperature", async () => {
   globalThis.fetch = (async (url, init) => {
-    assert.equal(url, "https://jxai.keloom.com/v1/chat/completions");
+    assert.equal(url, "https://example.com/v1/chat/completions");
     const body = JSON.parse(String(init?.body));
     assert.equal(body.model, config.model); assert.equal(body.temperature, undefined);
     const payload = JSON.parse(body.messages[1].content);
